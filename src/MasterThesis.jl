@@ -17,5 +17,7 @@ include("models/WagnerModel.jl")
 
 include("models/WagnerModelBenders.jl")
 
+include("models/SingleTardyJobs.jl")
+
 
 end

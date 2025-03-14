@@ -3,7 +3,7 @@ struct WagnerModel <: AbstractColumnGenerationModel
     p::Matrix{Int}
     phat::Matrix{Int}
     Λ::Vector{Tuple{BitVector, BitVector}}
-    Z::VariableRef
+    Z::Matrix{VariableRef}
     Γ1::Int
     Γ2::Int
     model::Model
