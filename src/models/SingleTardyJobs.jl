@@ -1,3 +1,10 @@
+mutable struct SingleTardyJobsVariables <: AbstractVariableRef
+    Z::Matrix{VariableRef}
+    S::Matrix{VariableRef}
+    U::Matrix{VariableRef}
+    y::VariableRef
+end
+
 struct SingleTardyJobsModel <: AbstractColumnGenerationModel
     n::Int
     p::Vector{Int}
@@ -6,10 +13,13 @@ struct SingleTardyJobsModel <: AbstractColumnGenerationModel
     d::Vector{Int}
     Γ::Int
     w::Vector{Int}
-    Z::Vector{VariableRef}
     Λ::Vector{BitVector}
+    M::Int
+    variables::SingleTardyJobsVariables
     model::Model
 end
+
+SingleTardyJobsModel(instance::SingleMachineDueDates) = SingleTardyJobsModel(instance.n, instance.p, instance.phat, instance.r, instance.d, instance.Γ)
 
 SingleTardyJobsModel(n::Int, p::Vector{Int}, phat::Vector{Int}, r::Vector{Int}, d::Vector{Int}, Γ::Int) = SingleTardyJobsModel(n, p, phat, r, d, Γ, ones(Int, n))
 
@@ -51,14 +61,22 @@ function SingleTardyJobsModel(n::Int, p::Vector{Int}, phat::Vector{Int}, r::Vect
 
     @constraint(model, [(λ, δ) in enumerate(Λ)], sum(w[j]*U[j,λ] for j in 1:n) <= y)
 
-    return SingleTardyJobsModel(n, p, phat, r, d, Γ, w, Z, Λ, model)
+    return SingleTardyJobsModel(n, p, phat, r, d, Γ, w, Λ, M, SingleTardyJobsVariables(Z,S,U,y), model)
 
 end
 
 
 function update_model!(model::SingleTardyJobsModel, new_Λ::Vector{BitVector})
-    @variable(model.model, S[1:model.n, (length(model.Λ)+1):(length(model.Λ)+length(new_Λ))] >= 0)
-    @variable(model.model, U[1:model.n, (length(model.Λ)+1):(length(model.Λ)+length(new_Λ))], Bin)
+    S_new = @variable(model.model, [1:model.n, (length(model.Λ)+1):(length(model.Λ)+length(new_Λ))], lower_bound = 0.0, base_name = "S")   
+    U_new = @variable(model.model, [1:model.n, (length(model.Λ)+1):(length(model.Λ)+length(new_Λ))], Bin, base_name = "U")
+
+    model.variables.S = hcat(model.variables.S, S_new)
+    model.variables.U = hcat(model.variables.U, U_new)
+    S = model.variables.S
+    U = model.variables.U
+    Z = model.variables.Z
+    y = model.variables.y
+
 
     λ = length(model.Λ) + 1
 
@@ -69,22 +87,71 @@ function update_model!(model::SingleTardyJobsModel, new_Λ::Vector{BitVector})
                 if i == j
                     continue
                 end
-                @constraint(model.model, S[j,λ] >= S[i,λ] + model.p[i] + model.phat[i] * δ[i] - M * (1 - model.Z[i,j]))
+                @constraint(model.model, S[j,λ] >= S[i,λ] + model.p[i] + model.phat[i] * δ[i] - model.M * (1 - Z[i,j]))
             end
         end
 
-        @constraint(model.model, [j in 1:model.n], S[j,λ] + model.p[j] + model.phat[j] * δ[j] <= model.d[j] + M * U[j,λ])
+        @constraint(model.model, [j in 1:model.n], S[j,λ] + model.p[j] + model.phat[j] * δ[j] <= model.d[j] + model.M * U[j,λ])
 
-        @constraint(model.model, sum(model.w[j]*U[j,λ] for j in 1:model.n) <= model.y)
+        @constraint(model.model, sum(model.w[j]*U[j,λ] for j in 1:model.n) <= y)
 
         λ += 1
     end
+
+    append!(model.Λ, new_Λ)
     
     return model
 end
 
-function oracle_subproblem(model::SingleTardyJobsModel, Z::Matrix{Int})
-    σ = [findfirst(Z[i,:]) for i in 1:model.n]
+function find_job_permutation(x_matrix)
+    n = size(x_matrix, 1)  # Number of jobs
+    in_degree = Dict(j => 0 for j in 1:n)
+    adj_list = Dict(i => Int[] for i in 1:n)
+
+    # Build adjacency list and compute in-degrees
+    for i in 1:n
+        for j in 1:n
+            if i != j && x_matrix[i, j]
+                push!(adj_list[i], j)
+                in_degree[j] += 1
+            end
+        end
+    end
+
+    # Topological sorting using Kahn's Algorithm
+    queue = Queue{Int}()
+    for j in 1:n
+        if in_degree[j] == 0
+            enqueue!(queue, j)
+        end
+    end
+
+    job_sequence = Int[]
+
+    while !isempty(queue)
+        job = dequeue!(queue)
+        push!(job_sequence, job)
+        for neighbor in adj_list[job]
+            in_degree[neighbor] -= 1
+            if in_degree[neighbor] == 0
+                enqueue!(queue, neighbor)
+            end
+        end
+    end
+
+    return job_sequence  # The job permutation
+end
+
+function oracle_subproblem(model::SingleTardyJobsModel, kwargs)
+    Z_value = value.(model.variables.Z)
+    @show Z_value
+    Z = BitArray(Z_value .== 1.0)
+    @show Z
+
+
+    σ = find_job_permutation(Z)
+
+    @show σ
 
     n = model.n
     Γ = model.Γ
@@ -94,39 +161,48 @@ function oracle_subproblem(model::SingleTardyJobsModel, Z::Matrix{Int})
     phat = model.phat[σ]
     w = model.w[σ]
 
-    V = zeros(Int, model.n, model.Γ + 1, sum(model.w) + 1)
-    fill!(V, -Inf)
-    V = OffsetArray(V, 1:model.n, 0:model.Γ, 0:sum(model.w))
+    V = zeros(Int, model.n, model.Γ + 2, sum(model.w) + 1)
+    fill!(V, typemin(Int))
+    V = OffsetArray(V, 1:model.n, 0:(model.Γ+1), 0:sum(model.w))
+    last_V = [(-1,0,-1) for _ in V]
 
-    V[1,0,0] = if r[1] + p[1] <= d[1]
-        r[1]
+    # @show last_V
+
+    # @show V
+
+    max_alpha = (-1,0,-1)
+
+    if r[1] + p[1] <= d[1]
+        V[1,0,0] = r[1]
+        max_alpha = (1,0,0)
     else
-        -Inf
+        V[1,0,0] = typemin(Int)
     end
 
-    V[1,0,1] = if r[1] + p[1] <= d[1] 
-        -Inf
+    if r[1] + p[1] <= d[1] 
+        V[1,0,1] = typemin(Int)
     else
-        r[1] + p[1]
+        V[1,0,1] = r[1] + p[1]
+        max_alpha = (1,0,1)
     end
 
-    V[1,1,0] = if r[1] + p[1] + phat[1] <= d[1]
-        r[1] + p[1] + phat[1]
+    if r[1] + p[1] + phat[1] <= d[1]
+        V[1,1,0] = r[1] + p[1] + phat[1]
     else
-        -Inf
+        V[1,1,0] = typemin(Int)
     end
 
-    V[1,1,1] = if r[1] + p[1] + phat[1] <= d[1]
-        -Inf
+    if r[1] + p[1] + phat[1] <= d[1]
+        V[1,1,1] = typemin(Int)
     else
-        r[1] + p[1] + phat[1]
+        V[1,1,1] = r[1] + p[1] + phat[1]
     end
 
     for i in 2:n
-        V[i,0,0] = if abs(V[i-1,0,0]) + p[i] <= d[i]
+        V[i,0,0] = if V[i-1,0,0] != typemin(Int) && V[i-1,0,0] + p[i] <= d[i]
              max(r[i], V[i-1,0,0] + p[i])
         else
-            -Inf
+            typemin(Int)
         end 
     end
 
@@ -135,47 +211,95 @@ function oracle_subproblem(model::SingleTardyJobsModel, Z::Matrix{Int})
         for (α_before, α) in zip(cum_arr[1:end-1], cum_arr[2:end])
             V[i,0,α] = if V[i-1,0,α_before] + p[i] > d[i]
                 V[i-1,0,α_before] + p[i]
-            elseif abs(V[i-1,0,α]) + p[i] <= d[i]
+            elseif V[i-1,0,α] != typemin(Int) && V[i-1,0,α] + p[i] <= d[i]
                 max(r[i], V[i-1,0,α] + p[i])
             else
-                -Inf
+                typemin(Int)
+            end
+            if V[i,0,α] != (typemin(Int)) && α > max_alpha[3]
+                max_alpha = (i,0,α)
             end
         end
     end
 
     for i in 2:n
-        for γ in 1:i
-            V[i,γ,0] = if abs(V[i-1,γ,0]) + p[i] <= d[i] && abs(V[i-1,γ-1,0]) + p[i] + phat[i] <= d[i]
-                max(r[i], V[i-1,γ,0] + p[i], V[i-1,γ-1,0] + p[i] + phat[i])
-            elseif abs(V[i-1,γ-1,0]) + p[i] + phat[i] <= d[i]
-                max(r[i], V[i-1,γ-1,0] + p[i] + phat[i])
-            elseif abs(V[i-1,γ,0]) + p[i] <= d[i]
-                max(r[i], V[i-1,γ,0] + p[i])
+        for γ in 1:min(i, model.Γ+1)
+            if V[i-1,γ,0] != typemin(Int) && V[i-1,γ,0] + p[i] <= d[i] && V[i-1,γ-1,0] != typemin(Int) && V[i-1,γ-1,0] + p[i] + phat[i] <= d[i]
+                opt_1 = r[i]
+                opt_2 = V[i-1,γ,0] + p[i]
+                opt_3 = V[i-1,γ-1,0] + p[i] + phat[i]
+                V[i,γ,0] = max(opt_1, opt_2, opt_3)
+                if opt_2 > opt_3
+                    last_V[i,γ,0] = (i-1,γ,0)
+                else
+                    last_V[i,γ,0] = (i-1,γ-1,0)
+                end
+            elseif V[i-1,γ-1,0] != typemin(Int) && V[i-1,γ-1,0] + p[i] + phat[i] <= d[i]
+                V[i,γ,0] = max(r[i], V[i-1,γ-1,0] + p[i] + phat[i])
+                last_V[i,γ,0] = (i-1,γ-1,0)
+            elseif V[i-1,γ,0] != typemin(Int) && V[i-1,γ,0] + p[i] <= d[i]
+                V[i,γ,0] = max(r[i], V[i-1,γ,0] + p[i])
+                last_V[i,γ,0] = (i-1,γ,0)
             else
-                -Inf
+                V[i,γ,0] = typemin(Int)
             end
         end
     end
 
     for i in 2:n
-        for γ in 1:i
+        for γ in 1:min(i, model.Γ+1)
             cum_arr = [0;cumsum(w[1:i])]
             for (α_before, α) in zip(cum_arr[1:end-1], cum_arr[2:end])
-                V[i,γ,α] = if V[i-1,γ-1, α_before] + p[i] + phat[i] > d[i] || V[i-1,γ,α_before] + p[i] > d[i]
-                    max(V[i-1,γ,α_before] + p[i], V[i-1,γ-1,α_before] + p[i] + phat[i])
-                elseif abs(V[i-1,γ-1,α]) + p[i] + phat[i] <= d[i] && abs(V[i-1,γ,α]) + p[i] <= d[i]
-                    max(r[i], V[i-1,γ,α] + p[i], V[i-1,γ-1,α] + p[i] + phat[i])
-                elseif abs(V[i-1,γ-1,α]) + p[i] + phat[i] <= d[i]
-                    max(r[i], V[i-1,γ-1,α] + p[i] + phat[i])
-                elseif abs(V[i-1,γ,α]) + p[i] <= d[i]
-                    max(r[i], V[i-1,γ,α] + p[i])
+                if V[i-1,γ-1, α_before] + p[i] + phat[i] > d[i] || V[i-1,γ,α_before] + p[i] > d[i]
+                    opt_1 = V[i-1,γ,α_before] + p[i]
+                    opt_2 = V[i-1,γ-1,α_before] + p[i] + phat[i]
+                    V[i,γ,α] = max(opt_1, opt_2)
+                    if V[i,γ,α] == opt_1
+                        last_V[i,γ,α] = (i-1,γ,α_before)
+                    elseif V[i,γ,α] == opt_2
+                        last_V[i,γ,α] = (i-1,γ-1,α_before)
+                    end
+                    if α > max_alpha[3]
+                        max_alpha = (i,γ,α)
+                    end
+                elseif V[i-1,γ-1,α] != typemin(Int) && V[i-1,γ-1,α] + p[i] + phat[i] <= d[i] && V[i-1,γ,α] != typemin(Int) && V[i-1,γ,α] + p[i] <= d[i]
+                    opt_1 = r[i]
+                    opt_2 = V[i-1,γ,α] + p[i]
+                    opt_3 = V[i-1,γ-1,α] + p[i] + phat[i]
+                    V[i,γ,α] = max(opt_1, opt_2, opt_3)
+                    if opt_2 > opt_3
+                        last_V[i,γ,α] = (i-1,γ,α)
+                    else
+                        last_V[i,γ,α] = (i-1,γ-1,α)
+                    end
+                elseif V[i-1,γ-1,α] != typemin(Int) && V[i-1,γ-1,α] + p[i] + phat[i] <= d[i]
+                    V[i,γ,α] = max(r[i], V[i-1,γ-1,α] + p[i] + phat[i])
+                    last_V[i,γ,α] = (i-1,γ-1,α)
+                elseif V[i-1,γ,α] != typemin(Int) && V[i-1,γ,α] + p[i] <= d[i]
+                    V[i,γ,α] = max(r[i], V[i-1,γ,α] + p[i])
+                    last_V[i,γ,α] = (i-1,γ,α)
                 else
-                    -Inf
+                    V[i,γ,α] = typemin(Int)
                 end
             end
         end
     end
 
+    worst_case = max_alpha
+    @show worst_case
+    value_worst_case = worst_case[3]
+    δ = falses(n)
+    i = n
+    last_case = worst_case
+    while i > 0 && last_case != (-1,0,-1)
+        i, γ, α = last_case
+        @show i
+        @show last_case
+        last_case = last_V[i,γ,α]
+        if γ - last_case[2] == 1
+            δ[σ[i]] = true
+        end
+    end
 
-    
+    return value_worst_case, δ
 end

@@ -1,33 +1,42 @@
+struct WagnerModelVariables <: AbstractVariableRef
+    Z::Matrix{VariableRef}
+    X::Matrix{VariableRef}
+    Y::Matrix{VariableRef}
+    y::VariableRef
+end
+
 struct WagnerModel <: AbstractColumnGenerationModel
     n::Int
     p::Matrix{Int}
     phat::Matrix{Int}
     Λ::Vector{Tuple{BitVector, BitVector}}
-    Z::Matrix{VariableRef}
+    variables::WagnerModelVariables
     Γ1::Int
     Γ2::Int
     model::Model
 end
 
-function WagnerModel(n::int, p::Matrix{Int}, phat::Matrix{Int}, Γ::Tuple{Int, Int})
+function WagnerModel(n::Int, p::Matrix{Int}, phat::Matrix{Int}, Γ::Tuple{Int, Int})
     model = Model(GLPK.Optimizer)
 
-    model.Λ = [(falses(n), falses(n))]
+    Λ = [(falses(n), falses(n))]
 
     Γ1::Int, Γ2::Int = Γ
 
     @variable(model, Z[1:n, 1:n], Bin) 
 
-    model.Z = Z
+    Z = Z
 
-    @variable(model, X[1:n, 1:length(model.Λ)] >= 0)
+    @variable(model, X[1:n, 1:length(Λ)] >= 0)
 
-    @variable(model, Y[1:n, 1:length(model.Λ)] >= 0) 
+    @variable(model, Y[1:n, 1:length(Λ)] >= 0) 
 
     @variable(model, y >= 0)
 
     # (4)
     @objective(model, Min, y)
+
+    variables = WagnerModelVariables(Z, X, Y, y)
 
     # (5)
     for (λ,(δ1, δ2)) in enumerate(Λ)
@@ -43,7 +52,7 @@ function WagnerModel(n::int, p::Matrix{Int}, phat::Matrix{Int}, Γ::Tuple{Int, I
 
     # (7)
     for (λ,(δ1, δ2)) in enumerate(Λ)
-        @constraint(model, sum((p[1,i]+ phat[1,i] * δ1[i])*Z[i,1] for i in 1:n) = X[1, λ])
+        @constraint(model, sum((p[1,i]+ phat[1,i] * δ1[i])*Z[i,1] for i in 1:n) == X[1, λ])
     end
 
     # (8)
@@ -53,33 +62,36 @@ function WagnerModel(n::int, p::Matrix{Int}, phat::Matrix{Int}, Γ::Tuple{Int, I
     @constraint(model, [i in 1:n], sum(Z[i,j] for j in 1:n) == 1)
 
 
-    return WagnerModel(n, p, phat, Λ, Γ1, Γ2, model)
+    return WagnerModel(n, p, phat, Λ, variables, Γ1, Γ2, model)
 end
 
 
 function update_model!(model::WagnerModel, new_Λ::Vector{Tuple{BitVector, BitVector}})
-    @variable(model.model, X[1:model.n, (length(model.Λ)+1):(length(model.Λ)+length(new_Λ))] >= 0)
-    @variable(model.model, Y[1:model.n, (length(model.Λ)+1):(length(model.Λ)+length(new_Λ))] >= 0)
+    X = @variable(model.model, [1:model.n, (length(model.Λ)+1):(length(model.Λ)+length(new_Λ))], lower_bound = 0, base_name = "X")
+    Y = @variable(model.model, [1:model.n, (length(model.Λ)+1):(length(model.Λ)+length(new_Λ))], lower_bound = 0, base_name = "Y")
+
+    model.variables.X = hcat(model.variables.X, X)
+    model.variables.Y = hcat(model.variables.Y, Y)
 
     # update constaints (5)-(7)
     
     λ = length(model.Λ) + 1
     for (δ1, δ2) in new_Λ
-        @constraint(model.model, sum(model.p[2,i]+ model.phat[2,i] * δ2[i] for i in 1:model.n) + sum(X[j, λ] for j in 1:model.n) <= model.y)
+        @constraint(model.model, sum(model.p[2,i]+ model.phat[2,i] * δ2[i] for i in 1:model.n) + sum(model.variables.X[j, λ] for j in 1:model.n) <= model.y)
         λ += 1
     end
 
     λ = length(model.Λ) + 1
     for (δ1, δ2) in new_Λ
         @constraint(model.model, [j in 1:(model.n-1)],
-            sum((model.p[1,i]+ model.phat[1,i] * δ1[i])*model.Z[i,j+1] for i in 1:model.n) + model.Y[j+1, λ] == 
-            sum((model.p[2,i]+ model.phat[2,i] * δ2[i])*model.Z[i,j] for i in 1:model.n) + X[j+1, λ] + Y[j, λ])
+            sum((model.p[1,i]+ model.phat[1,i] * δ1[i])*model.variables.Z[i,j+1] for i in 1:model.n) + model.variables.Y[j+1, λ] == 
+            sum((model.p[2,i]+ model.phat[2,i] * δ2[i])*model.variables.Z[i,j] for i in 1:model.n) + model.variables.X[j+1, λ] + model.variables.Y[j, λ])
         λ += 1
     end
 
     λ = length(model.Λ) + 1
     for (δ1, δ2) in new_Λ
-        @constraint(model.model, sum((model.p[1,i]+ model.phat[1,i] * δ1[i])*model.Z[i,1] for i in 1:model.n) = X[1, λ])
+        @constraint(model.model, sum((model.p[1,i]+ model.phat[1,i] * δ1[i])*model.variables.Z[i,1] for i in 1:model.n) == model.variables.X[1, λ])
         λ += 1
     end
 
@@ -89,8 +101,11 @@ function update_model!(model::WagnerModel, new_Λ::Vector{Tuple{BitVector, BitVe
 end
 
 
-function oracle_subproblem(model::WagnerModel, Z::Matrix{Int})
+function oracle_subproblem(model::WagnerModel, kwargs)
     # Z is a permutation matrix. Transform it into a permutation vector
+
+    Z = value.(model.variables.Z)
+    
     σ = [findfirst(Z[i,:]) for i in 1:model.n]
 
     # solve subproblem using dynamic programming - top-down approach

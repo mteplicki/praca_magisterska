@@ -8,11 +8,11 @@ function generateBinaryArrays(n::Int, Γ::Int)
     return ([i in combo ? 1 : 0 for i in 1:n] for combo in combinations(1:n, Γ))
 end
 
-function generate_all_scenarios(n::int, Γ::Tuple{Int, Int})
+function generate_all_scenarios(n::Int, Γ::Tuple{Int, Int})
     return [(collect(δ1), collect(δ2)) for δ1 in generateBinaryArrays(n, Γ[1]) for δ2 in generateBinaryArrays(n, Γ[2])]
 end
 
-function WagnerModelBenders(n::int, p::Matrix{Int}, phat::Matrix{Int}, Γ::Tuple{Int, Int})
+function WagnerModelBenders(n::Int, p::Matrix{Int}, phat::Matrix{Int}, Γ::Tuple{Int, Int})
         model = Model(GLPK.Optimizer)
         subproblem = Model(GLPK.Optimizer)
 
@@ -53,7 +53,7 @@ function WagnerModelBenders(n::int, p::Matrix{Int}, phat::Matrix{Int}, Γ::Tuple
     
         # (7)
         for (λ,(δ1, δ2)) in enumerate(Λ)
-            @constraint(subproblem, sum((p[1,i]+ phat[1,i] * δ1[i])*Z[i,1] for i in 1:n) = X[1, λ])
+            @constraint(subproblem, sum((p[1,i]+ phat[1,i] * δ1[i])*Z[i,1] for i in 1:n) == X[1, λ])
         end
     
         # (8)
