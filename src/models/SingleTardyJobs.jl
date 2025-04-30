@@ -23,8 +23,8 @@ SingleTardyJobsModel(instance::SingleMachineDueDates) = SingleTardyJobsModel(ins
 
 SingleTardyJobsModel(n::Int, p::Vector{Int}, phat::Vector{Int}, r::Vector{Int}, d::Vector{Int}, Γ::Int) = SingleTardyJobsModel(n, p, phat, r, d, Γ, ones(Int, n))
 
-function SingleTardyJobsModel(n::Int, p::Vector{Int}, phat::Vector{Int}, r::Vector{Int}, d::Vector{Int}, Γ::Int, w::Vector{Int})
-    model = Model(GLPK.Optimizer)
+function SingleTardyJobsModel(optimizer, n::Int, p::Vector{Int}, phat::Vector{Int}, r::Vector{Int}, d::Vector{Int}, Γ::Int, w::Vector{Int})
+    model = Model(optimizer)
 
     Λ = [falses(n)]
 
@@ -32,7 +32,7 @@ function SingleTardyJobsModel(n::Int, p::Vector{Int}, phat::Vector{Int}, r::Vect
 
     M = sum(p) + sum(phat) + sum(r)
 
-    @variable(model, Z[1:n, 1:n], Bin) 
+    @variable(model, Z[1:n, 1:n], Bin)
 
     @variable(model, S[1:n, 1:length(Λ)] >= 0)
 
@@ -144,12 +144,23 @@ end
 
 function oracle_subproblem(model::SingleTardyJobsModel, kwargs)
     Z_value = value.(model.variables.Z)
-    @show Z_value
+    # @show Z_value
     Z = BitArray(Z_value .== 1.0)
-    @show Z
-
+    # @show Z
 
     σ = find_job_permutation(Z)
+
+    value_worst_case, δ = if haskey(model, :subproblem_method) && model[:subproblem_method] == 1
+        oracle_subproblem1(model, σ)
+    else
+        oracle_subproblem2(model, σ)
+    end
+
+    return value_worst_case, δ
+end
+
+function oracle_subproblem1(model::SingleTardyJobsModel, σ::Vector{Int})
+
 
     @show σ
 
@@ -302,4 +313,120 @@ function oracle_subproblem(model::SingleTardyJobsModel, kwargs)
     end
 
     return value_worst_case, δ
+end
+
+indicator_function(x) = if x > 0
+    1
+else
+    0
+end
+
+function oracle_subproblem2(model::SingleTardyJobsModel, σ::Vector{Int})
+    n = model.n
+    Γ = model.Γ
+    
+    p = model.p[σ]
+    phat = model.phat[σ]
+    d = model.d[σ]
+
+    Φ_hat = sort(phat, rev = true)[1:Γ] |> sum
+
+    α = zeros(Int, n, Γ + 1, Φ_hat + 1)
+
+    α = OffsetArray(α, 1:n, 0:Γ, 0:Φ_hat)
+
+    fill!(α, typemin(Int))
+
+    set_α = falses(n, Γ + 1, Φ_hat + 1)
+
+    set_α = OffsetArray(set_α, 1:n, 0:Γ, 0:Φ_hat)
+
+    last_α = [(-1,0,-1) for _ in α]
+
+    α[1,0,0] = indicator_function(p[1] - d[1])
+    set_α[1,0,0] = true
+
+    for γ in 1:Γ
+        α[1,γ,phat[1]] = indicator_function(p[1] + phat[1] - d[1])
+        
+    end
+    set_α[1,0:Γ,0:Φ_hat] .= true
+
+    for k in 2:n
+        α[k,0,0] = indicator_function(sum(p[i] for i in 1:k) - d[k]) + α[k-1,0,0]
+        set_α[k,0,0:Φ_hat] .= true
+    end
+
+    max_value = -Inf
+    max_value_args = (-1, 0,-1)
+    for k in 2:n
+        k_last = k-1
+        for γ in 1:model.Γ
+            for Θ in 0:Φ_hat
+                if Θ - phat[k] < 0
+                    if !set_α[k-1,γ,Θ]
+                        @warn "coś nie zadziałało, odwoływanie się do nieistniejącego przypadku 1"
+                    end
+                    if α[k-1,γ,Θ] != typemin(Int)
+                        α[k,γ,Θ] = indicator_function(Θ + sum(p[i] for i in 1:k) - d[k]) + α[k-1,γ,Θ]
+                        last_α[k,γ,Θ] = (k_last, γ, Θ)
+                    else
+                        α[k,γ,Θ] = typemin(Int)
+                    end
+                else
+                    if !set_α[k-1,γ,Θ]
+                        @warn "coś nie zadziałało, odwoływanie się do nieistniejącego przypadku 2: $(k-1), $γ, $Θ"
+                    end
+                    opt_1 = α[k-1,γ,Θ]
+                    if !set_α[k-1,γ-1,Θ-phat[k]]
+                        @warn "coś nie zadziałało, odwoływanie się do nieistniejącego przypadku 3: $(k-1), $(γ-1), $(Θ-phat[k])"
+                    end
+                    opt_2 = α[k-1,γ-1,Θ-phat[k]]
+                    if opt_1 != typemin(Int) || opt_2 != typemin(Int)
+                        α[k,γ,Θ] = indicator_function(Θ + sum(p[i] for i in 1:k) - d[k]) + max(opt_1, opt_2)
+                        if opt_1 > opt_2
+                            last_α[k,γ,Θ] = (k_last, γ, Θ)
+                        else
+                            last_α[k,γ,Θ] = (k_last, γ-1, Θ-phat[k])
+                        end
+                    else
+                        α[k,γ,Θ] = typemin(Int)
+                    end
+                end
+                set_α[k,γ,Θ] = true
+            end
+        end
+    end
+
+    δ = falses(n)
+
+    # find worst last_case
+
+    @show all(set_α)
+
+    max_value_args = (-1,0,-1)
+    max_value = typemin(Int)
+
+    for Φ in 0:Φ_hat
+        if α[n,Γ,Φ] > max_value
+            max_value = α[n,Γ,Φ]
+            max_value_args = (n,Γ,Φ)
+        end
+    end
+
+    i = n
+    last_case = max_value_args
+    while i > 0 && last_case != (-1,0,-1)
+        i, γ, α = last_case
+        last_case = last_α[i,γ,α]
+        if γ - last_case[2] == 1
+            δ[σ[i]] = true
+        end
+    end
+
+    if i != 1
+        @warn "Something went wrong, i = $i"
+    end
+
+    return max_value, δ
 end

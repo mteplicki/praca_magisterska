@@ -16,9 +16,8 @@ end
 
 MultiUnrelatedMakespan(instance::MultiUnrelatedInstance) = MultiUnrelatedMakespan(instance.n, instance.m, instance.p, instance.phat, instance.Γ)
 
-
-function MultiUnrelatedMakespan(n::Int, m::Int, p::Matrix{Int}, phat::Matrix{Int}, Γ::Int)
-    model = Model(GLPK.Optimizer)
+function MultiUnrelatedMakespan(optimizer, n::Int, m::Int, p::Matrix{Int}, phat::Matrix{Int}, Γ::Int)
+    model = Model(optimizer)
 
     #Lenstra–Shmoys–Tardos linear program
     Λ = [falses(n)]

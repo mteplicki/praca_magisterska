@@ -30,15 +30,17 @@ include("instances/SingleMachineDueDates.jl")
 
 include("instances/MultiUnrelatedInstance.jl")
 
-include("models/WagnerModel.jl")
+# include("models/WagnerModel.jl")
 
-include("models/WagnerModelBenders.jl")
+# include("models/WagnerModelBenders.jl")
 
 include("models/SingleTardyJobs.jl")
 
 include("models/MultiUnrelatedMakespan.jl")
 
 include("models/SingleTardySum.jl")
+
+include("models/SingleTardinessDominanceRules.jl")
 
 
 end

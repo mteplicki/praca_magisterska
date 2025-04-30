@@ -1,1 +1,4 @@
-{}
+{
+    "julia.inlayHints.static.enabled": true,
+    "julia.lint.missingrefs": "all"
+}
