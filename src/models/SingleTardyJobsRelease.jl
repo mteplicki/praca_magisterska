@@ -6,6 +6,7 @@ mutable struct SingleTardyJobsVariables <: AbstractVariableRef
 end
 
 struct SingleTardyJobsModel <: AbstractColumnGenerationModel
+    instance::SingleMachineDueDates
     n::Int
     p::Vector{Int}
     phat::Vector{Int}

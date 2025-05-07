@@ -14,7 +14,13 @@ function save_instance(path::AbstractString, inst::T) where T <: AbstractInstanc
     end
 end
 
-function load_instance(path::AbstractString, ::Typeof{T})::T where T <: AbstractInstance
+function load_instance(path::AbstractString, ::Type{T})::T where T <: AbstractInstance
+    open(path) do io
+        return deserialize(io)
+    end
+end
+
+function load_instance(path::AbstractString)
     open(path) do io
         return deserialize(io)
     end

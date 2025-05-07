@@ -4,6 +4,7 @@ struct MultiUnrelatedMakespanVariables <: AbstractVariableRef
 end
 
 struct MultiUnrelatedMakespan <: AbstractColumnGenerationModel
+    instance::MultiUnrelatedInstance
     n::Int
     m::Int
     p::Matrix{Int}
@@ -32,7 +33,7 @@ function MultiUnrelatedMakespan(optimizer, n::Int, m::Int, p::Matrix{Int}, phat:
 
     @objective(model, Min, T)
 
-    return MultiUnrelatedMakespan(n, m, p, phat, Λ, Γ, MultiUnrelatedMakespanVariables(Z,T) ,model)
+    return MultiUnrelatedMakespan(MultiUnrelatedInstance(n,m,p,phat,Γ),n, m, p, phat, Λ, Γ, MultiUnrelatedMakespanVariables(Z,T) ,model)
 end
 
 function update_model!(model::MultiUnrelatedMakespan, new_Λ::Vector{BitVector}, LB::Float64)

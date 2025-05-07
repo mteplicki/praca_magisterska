@@ -6,6 +6,7 @@ mutable struct SingleTardyJobsVariables <: AbstractVariableRef
 end
 
 struct SingleTardyJobsModel <: AbstractColumnGenerationModel
+    instance::SingleMachineDueDates
     n::Int
     p::Vector{Int}
     phat::Vector{Int}
@@ -58,7 +59,7 @@ function SingleTardyJobsModel(optimizer, n::Int, p::Vector{Int}, phat::Vector{In
 
     @constraint(model, [(λ, δ) in enumerate(Λ)], sum(w[j]*U[j,λ] for j in 1:n) <= y)
 
-    return SingleTardyJobsModel(n, p, phat, d, Γ, w, Λ, M, SingleTardyJobsVariables(Z,S,U,y), model)
+    return SingleTardyJobsModel(SingleMachineDueDates(n,p,phat,r,d,Γ),n, p, phat, d, Γ, w, Λ, M, SingleTardyJobsVariables(Z,S,U,y), model)
 end
 
 

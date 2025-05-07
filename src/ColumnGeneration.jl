@@ -3,12 +3,21 @@ struct ColumnGenerationStats
     LB::Vector{Float64}
     UB::Vector{Float64}
     iterations::Ref{Int}
+    optimizer::String
     kwargs
 end
 
 function column_generation(model::T; ϵ=10^-6, max_iterations=-1, kwargs...) where T <: AbstractColumnGenerationModel
 
-    stats = ColumnGenerationStats(Ref(false),Float64[], Float64[], Ref(0), kwargs)
+    # Pobieramy "prawdziwy" optymalizator spod warstw mostów
+    optimizer = backend(model.model).optimizer
+    while optimizer isa MathOptInterface.AbstractOptimizer && hasproperty(optimizer, :model)
+        optimizer = optimizer.model
+    end
+
+    solver_name = string(typeof(optimizer))
+
+    stats = ColumnGenerationStats(Ref(false),Float64[], Float64[], Ref(0), solver_name, kwargs)
 
     LB = -Inf
     UB = Inf

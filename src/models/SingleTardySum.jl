@@ -5,6 +5,7 @@ mutable struct SingleTardinessVariables <: AbstractVariableRef
 end
 
 struct SingleTardiness <: AbstractColumnGenerationModel
+    instance::SingleMachineDueDates
     n::Int
     p::Vector{Int}
     phat::Vector{Int}
@@ -39,7 +40,7 @@ function SingleTardiness(optimizer, n::Int, p::Vector{Int}, phat::Vector{Int}, d
 
     @objective(model, Min, z)
 
-    return SingleTardiness(n, p, phat, d, Γ, SingleTardinessVariables(x,t,z), Λ, model)
+    return SingleTardiness(SingleMachineDueDates(n,p,phat,r,d,Γ),n, p, phat, d, Γ, SingleTardinessVariables(x,t,z), Λ, model)
 end
 
 function update_model!(model::SingleTardiness, new_Λ::Vector{BitVector}, LB::Float64)
