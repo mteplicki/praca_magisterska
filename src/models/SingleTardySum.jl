@@ -15,7 +15,7 @@ struct SingleTardiness <: AbstractColumnGenerationModel
     model::Model
 end
 
-SingleTardiness(instance::SingleMachineDueDates) = SingleTardiness(instance.n, instance.p, instance.phat, instance.d, instance.Γ)
+SingleTardiness(optimizer, instance::SingleMachineDueDates) = SingleTardiness(optimizer, instance.n, instance.p, instance.phat, instance.d, instance.Γ)
 
 function SingleTardiness(optimizer, n::Int, p::Vector{Int}, phat::Vector{Int}, d::Vector{Int}, Γ::Int)
     model = Model(optimizer)
@@ -42,7 +42,7 @@ function SingleTardiness(optimizer, n::Int, p::Vector{Int}, phat::Vector{Int}, d
     return SingleTardiness(n, p, phat, d, Γ, SingleTardinessVariables(x,t,z), Λ, model)
 end
 
-function update_model!(model::SingleTardiness, new_Λ::Vector{BitVector})
+function update_model!(model::SingleTardiness, new_Λ::Vector{BitVector}, LB::Float64)
     t_new = @variable(model.model, [1:model.n, (length(model.Λ) + 1):(length(model.Λ) + length(new_Λ))], lower_bound = 0, base_name = "t")
     # concatenate the new t variables to the old ones
     model.variables.t = hcat(model.variables.t, t_new)
@@ -54,6 +54,7 @@ function update_model!(model::SingleTardiness, new_Λ::Vector{BitVector})
     @constraint(model.model, [k in 1:model.n, (λ, δ) in enumerate(new_Λ)], 
         sum((model.p[i] + model.phat[i] * δ[i]) * sum(x[i,u] for u in 1:k) for i in 1:model.n) - sum(model.d[i]* x[i,k] for i in 1:model.n) <= t[k,λ_old+λ])
     append!(model.Λ, new_Λ)
+    @constraint(model.model, z >= LB)
     return model
 end
 
@@ -114,7 +115,7 @@ function check_worst_case(model::SingleTardiness, σ::Vector{Int}, δ::BitVector
 
     C = C[2:end]
     
-    if T != expected_value
+    if sum_T != expected_value
         @warn "Expected value $expected_value, got $sum_T"
     end
 end
@@ -319,3 +320,16 @@ function oracle_subproblem_single_tardiness2(n, Γ, p, phat, d, σ::Vector{Int})
     return max_value, δ
 end
 
+function find_permutation(model::SingleTardiness)
+    x = value.(model.variables.x)
+    # create a permutation of the jobs based on the x variables
+    σ = zeros(Int, model.n)
+    for i in 1:model.n
+        for k in 1:model.n
+            if x[i,k] == 1
+                σ[k] = i
+            end
+        end
+    end
+    return σ
+end

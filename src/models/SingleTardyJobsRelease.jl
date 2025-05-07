@@ -9,6 +9,7 @@ struct SingleTardyJobsModel <: AbstractColumnGenerationModel
     n::Int
     p::Vector{Int}
     phat::Vector{Int}
+    r::Vector{Int}
     d::Vector{Int}
     Γ::Int
     w::Vector{Int}
@@ -18,18 +19,18 @@ struct SingleTardyJobsModel <: AbstractColumnGenerationModel
     model::Model
 end
 
-SingleTardyJobsModel(optimizer, instance::SingleMachineDueDates) = SingleTardyJobsModel(optimizer,instance.n, instance.p, instance.phat, instance.d, instance.Γ)
+SingleTardyJobsModel(optimizer, instance::SingleMachineDueDates) = SingleTardyJobsModel(optimizer,instance.n, instance.p, instance.phat, instance.r, instance.d, instance.Γ)
 
-SingleTardyJobsModel(optimizer,n::Int, p::Vector{Int}, phat::Vector{Int}, d::Vector{Int}, Γ::Int) = SingleTardyJobsModel(optimizer,n, p, phat, d, Γ, ones(Int, n))
+SingleTardyJobsModel(optimizer,n::Int, p::Vector{Int}, phat::Vector{Int}, r::Vector{Int}, d::Vector{Int}, Γ::Int) = SingleTardyJobsModel(optimizer,n, p, phat, r, d, Γ, ones(Int, n))
 
-function SingleTardyJobsModel(optimizer, n::Int, p::Vector{Int}, phat::Vector{Int}, d::Vector{Int}, Γ::Int, w::Vector{Int})
+function SingleTardyJobsModel(optimizer, n::Int, p::Vector{Int}, phat::Vector{Int}, r::Vector{Int}, d::Vector{Int}, Γ::Int, w::Vector{Int})
     model = Model(optimizer)
 
     Λ = [falses(n)]
 
     # big M
 
-    M = sum(p) + sum(phat)
+    M = sum(p) + sum(phat) + sum(r)
 
     @variable(model, Z[1:n, 1:n], Bin)
 
@@ -40,6 +41,8 @@ function SingleTardyJobsModel(optimizer, n::Int, p::Vector{Int}, phat::Vector{In
     @variable(model, y >= 0)
 
     @objective(model, Min, y)
+
+    @constraint(model, [j in 1:n, (λ, δ) in enumerate(Λ)], S[j,λ] >= r[j])
 
     for i in 1:n
         for j in 1:n
@@ -58,7 +61,8 @@ function SingleTardyJobsModel(optimizer, n::Int, p::Vector{Int}, phat::Vector{In
 
     @constraint(model, [(λ, δ) in enumerate(Λ)], sum(w[j]*U[j,λ] for j in 1:n) <= y)
 
-    return SingleTardyJobsModel(n, p, phat, d, Γ, w, Λ, M, SingleTardyJobsVariables(Z,S,U,y), model)
+    return SingleTardyJobsModel(n, p, phat, r, d, Γ, w, Λ, M, SingleTardyJobsVariables(Z,S,U,y), model)
+
 end
 
 
@@ -77,6 +81,7 @@ function update_model!(model::SingleTardyJobsModel, new_Λ::Vector{BitVector}, L
     λ = length(model.Λ) + 1
 
     for (δ) in new_Λ
+        @constraint(model.model, [j in 1:model.n], S[j,λ] >= model.r[j])
         for i in 1:model.n
             for j in 1:model.n
                 if i == j
@@ -93,9 +98,9 @@ function update_model!(model::SingleTardyJobsModel, new_Λ::Vector{BitVector}, L
         λ += 1
     end
 
-    @constraint(model.model, y >= LB)
-
     append!(model.Λ, new_Λ)
+
+    @constraint(model.model, y >= LB)
     
     return model
 end
@@ -165,7 +170,7 @@ function oracle_subproblem1(model::SingleTardyJobsModel, σ::Vector{Int})
 
     n = model.n
     Γ = model.Γ
-    r = zeros(Int, n)
+    r = model.r[σ]
     d = model.d[σ]
     p = model.p[σ]
     phat = model.phat[σ]
@@ -428,18 +433,4 @@ function oracle_subproblem2(model::SingleTardyJobsModel, σ::Vector{Int})
     end
 
     return max_value, δ
-end
-
-function find_permutation(model::SingleTardyJobsModel)
-    Z = value.(model.variables.Z)
-    n = model.n
-    σ = zeros(Int, n)
-    for i in 1:n
-        for j in 1:n
-            if Z[i,j] == 1
-                σ[j] = i
-            end
-        end
-    end
-    return σ
 end

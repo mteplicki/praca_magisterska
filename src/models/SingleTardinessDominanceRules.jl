@@ -18,19 +18,26 @@ struct SingleTardinessDominanceRules <: AbstractColumnGenerationModel
     model::Model
 end
 
-function domination(i, j, E, L, p, phat, d, Γ)
-    if p[i] + phat[i] < p[j] && d[i] <= max(E[j], d[j])
+function domination(i, j, E_j, L_i, p, phat, d, Γ)
+    # @show p, phat, d, E
+    if p[i] + phat[i] < p[j] && d[i] <= max(E_j, d[j])
+        # println("Dominacja v1: $i poprzedza $j")
+        # println("$(p[i]) + $(phat[i]) < $(p[j]) && $(d[i]) <= max($E_j, $(d[j]))")
         return true
-    elseif d[j] >= max(L[i] - p[i], d[i])
+    elseif d[j] >= max(L_i - p[j], d[i])
+        # println("Dominacja v2: $i poprzedza $j")
+        # println("$(d[j]) >= max($(L_i) - $(p[j]), $(d[i]))")
         return true
-    elseif d[j] >= L[i]
+    elseif d[j] >= L_i
+        # println("Dominacja v3: $i poprzedza $j")
+        # println("$(d[j]) >= $(L_i)")
         return true
     else
         return false
     end
 end
 
-E_func(i, B_i, p) = sum(p[B[i]]) + p[i]
+E_func(i, B_i, p) = sum(p[B_i]) + p[i]
 
 function L_func(i, n, A_i, p, phat, Γ)
     N_minus_A_i = setdiff(1:n, A_i)
@@ -49,27 +56,38 @@ function compute_dominated_sets(n, p, phat, d, Γ)
     while changed
         changed = false
         for i in 1:n
+            # @show i
             Ei = E_func(i, B[i], p)
             Li = L_func(i, n, A[i], p, phat, Γ)
+            # @show Ei
+            # @show Li
+            
             for j in 1:n
                 if i == j 
                     continue 
                 end
+                @show i,j
                 
                 # Dla drugiej strony dominacji, należy również wyliczyć E[j] i L[j]
                 Ej = E_func(j, B[j], p)
                 Lj = L_func(j, n, A[j], p, phat, Γ)
+                # @show Ej
+                # @show Lj
                 
                 # Sprawdzamy warunek dominacji – można dostosować argumenty w zależności od interpretacji reguły
-                if domination(i, j, Ej, Li, p, phat, d, Γ)
+                if domination(i, j, Ej, Li, p, phat, d, Γ) && (!(i in A[j]) || !(j in B[i]))
                     # jeżeli reguła wskazuje, że i dominuje j, to dodajemy j do A[i] oraz i do B[j]
                     if !(j in A[i])
                         push!(A[i], j)
                         changed = true
+                        # println("Dodano $j do A[$i]")
+                        # println("A = $A")
                     end
                     if !(i in B[j])
                         push!(B[j], i)
                         changed = true
+                        # println("Dodano $i do B[$j]")
+                        # println("B = $B")
                     end
                 end
             end
@@ -80,7 +98,7 @@ end
 
 
 
-SingleTardinessDominanceRules(instance::SingleMachineDueDates) = SingleTardinessDominanceRules(instance.n, instance.p, instance.phat, instance.d, instance.Γ)
+SingleTardinessDominanceRules(optimizer, instance::SingleMachineDueDates) = SingleTardinessDominanceRules(optimizer, instance.n, instance.p, instance.phat, instance.d, instance.Γ)
 
 function SingleTardinessDominanceRules(optimizer, n::Int, p::Vector{Int}, phat::Vector{Int}, d::Vector{Int}, Γ::Int)
     model = Model(optimizer)
@@ -91,10 +109,7 @@ function SingleTardinessDominanceRules(optimizer, n::Int, p::Vector{Int}, phat::
 
     A, B = compute_dominated_sets(n, p, phat, d, Γ)
 
-    x = [[] for _ in 1:n]
-    for i in 1:n
-        x[i] = @variable(model, [(length(B[i]) + 1):(n-length(A[i]))], base_name = "x")
-    end
+    x = [@variable(model, [(length(B[i]) + 1):(n-length(A[i]))], base_name = "x") for i in 1:n]
 
     @variable(model, t[1:n, 1:length(Λ)] >= 0)
 
@@ -104,8 +119,21 @@ function SingleTardinessDominanceRules(optimizer, n::Int, p::Vector{Int}, phat::
 
     feasible_substraction_set = [[i for i in 1:n if length(B[i]) < k && k <= n-length(A[i])] for k in 1:n]
 
+    # @show p, length(p)
+    # @show phat, length(phat)
+    # @show Λ, length(Λ)
+    # @show d, length(d)
+    # @show feasible_substraction_set, length(feasible_substraction_set)
+    @show [(length(B[i]) + 1):(n-length(A[i])) for i in 1:n]
+    @show A
+    @show B
+    # @show x, length(x)
+    # @show t, length(t)
+
+    # @constraint(model,[k in 1:n, (λ, δ) in enumerate(Λ)], sum(d[i]* x[i][k] for i in feasible_substraction_set[k]) <= t[k,λ])
+
     @constraint(model, [k in 1:n, (λ, δ) in enumerate(Λ)], 
-        sum((p[i] + phat[i] * δ[i]) * sum(x[i][u] for u in length(B[i]):min(k, n-length(A[i]))) for i in 1:n) - sum(d[i]* x[i][k] for i in feasible_substraction_set[k]) <= t[k,λ])
+        sum((p[i] + phat[i] * δ[i]) * sum(x[i][u] for u in (length(B[i])+1):min(k, n-length(A[i]))) for i in 1:n) - sum(d[i]* x[i][k] for i in feasible_substraction_set[k]) <= t[k,λ])
 
     @constraint(model, [i in 1:n], sum(x[i][k] for k in (length(B[i])+1):(n-length(A[i]))) == 1)
 
@@ -119,7 +147,7 @@ function SingleTardinessDominanceRules(optimizer, n::Int, p::Vector{Int}, phat::
     return SingleTardinessDominanceRules(n, p, phat, d, Γ, SingleTardinessDominanceRulesVariables(x,t,z, feasible_substraction_set, A, B), Λ, model)
 end
 
-function update_model!(model::SingleTardinessDominanceRules, new_Λ::Vector{BitVector})
+function update_model!(model::SingleTardinessDominanceRules, new_Λ::Vector{BitVector}, LB::Float64)
     t_new = @variable(model.model, [1:model.n, (length(model.Λ) + 1):(length(model.Λ) + length(new_Λ))], lower_bound = 0, base_name = "t")
     # concatenate the new t variables to the old ones
     model.variables.t = hcat(model.variables.t, t_new)
@@ -138,10 +166,11 @@ function update_model!(model::SingleTardinessDominanceRules, new_Λ::Vector{BitV
     @constraint(model.model, [k in 1:model.n, (λ, δ) in enumerate(new_Λ)], 
     sum((p[i] + phat[i] * δ[i]) * sum(x[i][u] for u in length(B[i]):min(k, n-length(A[i]))) for i in 1:n) - sum(d[i]* x[i][k] for i in feasible_substraction_set[k]) <= t[k,λ_old+λ])
     append!(model.Λ, new_Λ)
+    @constraint(model.model, z >= LB)
     return model
 end
 
-function oracle_subproblem(model::SingleTardinessDominanceRules)
+function oracle_subproblem(model::SingleTardinessDominanceRules, kwargs)
     x = [value.(model.variables.x[i]) for i in 1:model.n]
     r = zeros(Int, model.n)
     A = model.variables.A
@@ -180,4 +209,17 @@ function oracle_subproblem(model::SingleTardinessDominanceRules)
 
     return worst_value, δ
     
+end
+
+function find_permutation(model::SingleTardinessDominanceRules)
+    # find the permutation of the jobs based on the x variables
+    σ = zeros(Int, model.n)
+    for i in 1:model.n
+        for k in (length(model.variables.B[i])+1):(model.n-length(model.variables.A[i]))
+            if model.variables.x[i][k] == 1
+                σ[k] = i
+            end
+        end
+    end
+    return σ
 end

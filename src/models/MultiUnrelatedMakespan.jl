@@ -14,7 +14,7 @@ struct MultiUnrelatedMakespan <: AbstractColumnGenerationModel
     model::Model
 end
 
-MultiUnrelatedMakespan(instance::MultiUnrelatedInstance) = MultiUnrelatedMakespan(instance.n, instance.m, instance.p, instance.phat, instance.Γ)
+MultiUnrelatedMakespan(optimizer, instance::MultiUnrelatedInstance) = MultiUnrelatedMakespan(optimizer, instance.n, instance.m, instance.p, instance.phat, instance.Γ)
 
 function MultiUnrelatedMakespan(optimizer, n::Int, m::Int, p::Matrix{Int}, phat::Matrix{Int}, Γ::Int)
     model = Model(optimizer)
@@ -35,7 +35,7 @@ function MultiUnrelatedMakespan(optimizer, n::Int, m::Int, p::Matrix{Int}, phat:
     return MultiUnrelatedMakespan(n, m, p, phat, Λ, Γ, MultiUnrelatedMakespanVariables(Z,T) ,model)
 end
 
-function update_model!(model::MultiUnrelatedMakespan, new_Λ::Vector{BitVector})
+function update_model!(model::MultiUnrelatedMakespan, new_Λ::Vector{BitVector}, LB::Float64)
     Z = model.variables.Z
     T = model.variables.T
 
@@ -43,7 +43,17 @@ function update_model!(model::MultiUnrelatedMakespan, new_Λ::Vector{BitVector})
     
     append!(model.Λ, new_Λ)
 
+    @constraint(model.model, T >= LB)
+
     return model
+end
+
+function check_worst_case(model::MultiUnrelatedMakespan, jobs_to_machines, λ::BitVector, expected_value)
+    times = [sum(model.p[i,j] + model.phat[i,j] * λ[j] for j in jobs_to_machines[i]; init=0) for i in 1:model.m]
+    result = maximum(times)
+    if result != expected_value
+        @warn "essa: res $expected_value != $result"
+    end
 end
 
 function oracle_subproblem(model::MultiUnrelatedMakespan, kwargs)
@@ -63,16 +73,16 @@ function oracle_subproblem(model::MultiUnrelatedMakespan, kwargs)
         end
     end
 
-    nominal_times = [sum(model.p[i,j] for j in jobs_to_machines[i]) for i in 1:model.m]
+    nominal_times = [sum(model.p[i,j] for j in jobs_to_machines[i]; init=0) for i in 1:model.m]
 
     overtimes = [[(model.phat[i,j], j) for j in jobs_to_machines[i]] for i in 1:model.m]
 
     for i in 1:model.m
-        sort!(overtimes[i], by = x -> x[1])
+        sort!(overtimes[i], by = x -> x[1], rev = true)
         overtimes[i] = overtimes[i][1:min(model.Γ,length(overtimes[i]))]
     end
 
-    sum_of_overtimes = [sum(x[1] for x in overtimes[i]) for i in 1:model.m]
+    sum_of_overtimes = [sum(x[1] for x in overtimes[i]; init=0) for i in 1:model.m]
 
     times = nominal_times .+ sum_of_overtimes
 
@@ -85,7 +95,7 @@ function oracle_subproblem(model::MultiUnrelatedMakespan, kwargs)
 
     if length(jobs_deviate) < model.Γ
         times_machines = [(times[machine], machine) for machine in 1:model.m]
-        sort!(times_machines, by = x -> x[1])
+        sort!(times_machines, by = x -> x[1], rev = true)
         machines_ordered = [x[2] for x in times_machines[2:end]]
 
         for machine in machines_ordered
@@ -100,6 +110,28 @@ function oracle_subproblem(model::MultiUnrelatedMakespan, kwargs)
     end
 
     λ = BitVector([j in jobs_deviate for j in 1:model.n])
+
+    check_worst_case(model, jobs_to_machines, λ, value_worst)
     
     return value_worst, λ
+end
+
+function find_permutation(model::MultiUnrelatedMakespan)
+    # Z is a matrix of size m x n
+    # Z[i,j] = 1 if job j is assigned to machine i
+    # Z[i,j] = 0 otherwise
+
+    Z = value.(model.variables.Z)
+
+    jobs_to_machines = [[] for _ in 1:model.m]
+
+    for j in 1:model.n
+        for i in 1:model.m
+            if Z[i,j] == 1
+                push!(jobs_to_machines[i], j)
+            end
+        end
+    end
+
+    return jobs_to_machines
 end
