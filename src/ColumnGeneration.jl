@@ -1,14 +1,16 @@
 struct ColumnGenerationStats
-    optimality::Ref{Bool}
+    res::Float64
+    permutation::Vector{Int}
+    optimality::Bool
     LB::Vector{Float64}
     UB::Vector{Float64}
-    iterations::Ref{Int}
+    iterations::Int
     optimizer::String
     kwargs
 end
 
-function column_generation(model::T; ϵ=10^-6, max_iterations=-1, kwargs...) where T <: AbstractColumnGenerationModel
-
+function column_generation(model::T; ϵ=10^-6, max_iterations=-1, timeout=7200, kwargs...) where T <: AbstractColumnGenerationModel
+    time_start = time()
     # Pobieramy "prawdziwy" optymalizator spod warstw mostów
     optimizer = backend(model.model).optimizer
     while optimizer isa MathOptInterface.AbstractOptimizer && hasproperty(optimizer, :model)
@@ -17,7 +19,10 @@ function column_generation(model::T; ϵ=10^-6, max_iterations=-1, kwargs...) whe
 
     solver_name = string(typeof(optimizer))
 
-    stats = ColumnGenerationStats(Ref(false),Float64[], Float64[], Ref(0), solver_name, kwargs)
+    LB_vec = Float64[]
+    UB_vec = Float64[]
+
+    # stats = ColumnGenerationStats(Ref(false),Float64[], Float64[], Ref(0), solver_name, kwargs)
 
     LB = -Inf
     UB = Inf
@@ -29,10 +34,16 @@ function column_generation(model::T; ϵ=10^-6, max_iterations=-1, kwargs...) whe
 
         @show model.model
 
+        # set timeout for CPLEX 
+        if timeout != -1
+            set_optimizer_attribute(model.model, "CPXPARAM_TimeLimit", timeout)
+        end
+
         optimize!(model.model)
 
         if termination_status(model.model) != MOI.OPTIMAL
-            throw(ArgumentError("Model is not optimal"))
+            @warn("Model is not optimal")
+            return ColumnGenerationStats(UB, [], false, LB_vec, UB_vec, iteration, solver_name, kwargs)
         end
 
         y_opt = objective_value(model.model)
@@ -59,12 +70,15 @@ function column_generation(model::T; ϵ=10^-6, max_iterations=-1, kwargs...) whe
             @warn("Maximum number of iterations reached")
             break
         end
+        if timeout != -1
+            time_elapsed = time() - time_start
+            if time_elapsed > timeout
+                @warn("Timeout reached")
+                break
+            end
+        end
     end
-    stats.iterations[] = iteration
-    stats.optimality[] = (UB - LB) <= ϵ
 
-    permutation = find_permutation(model)
-
-    return UB, permutation, stats
+    return ColumnGenerationStats(UB, permutation, (UB - LB) <= ϵ, stats.LB, stats.UB, iteration, solver_name, kwargs)
 
 end

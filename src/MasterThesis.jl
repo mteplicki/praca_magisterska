@@ -37,7 +37,7 @@ include("instances/SingleMachineDueDates.jl")
 
 include("instances/MultiUnrelatedInstance.jl")
 
-# include("models/WagnerModel.jl")
+include("models/WagnerModel.jl")
 
 # include("models/WagnerModelBenders.jl")
 

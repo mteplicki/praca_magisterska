@@ -50,6 +50,7 @@ function test_instances(dir_instances::String, optimizer)
             "SingleTardyJobs" => SingleTardyJobsModel(optimizer, instance)
             "SingleTardinessDominanceRules" => SingleTardinessDominanceRules(optimizer, instance)
             "SingleMachineDueDates" => SingleMachineDueDates(optimizer, instance)
+            "2RPFP" => WagnerModel(optimizer, instance)
         end
         # Test the model
         res_test_model = test_model(model)

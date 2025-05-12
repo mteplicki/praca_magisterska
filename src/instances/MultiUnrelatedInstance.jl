@@ -18,3 +18,11 @@ function MultiUnrelatedInstance(n::Int, m::Int, G::Float64)
 
     return MultiUnrelatedInstance(n, m, p, phat, Γ)
 end
+
+function MultiUnrelatedInstance(n::Int, m::Int, G::Float64, p::Matrix{Int})
+    phat = [rand(floor(p_i * 2 /G):ceil(p_i * 7 /G)) for p_i in p]
+
+    Γ = rand(floor(5*10^-3*G*n):ceil(9*10^-3*G*n))
+
+    return MultiUnrelatedInstance(n, m, p, phat, Γ)
+end 
