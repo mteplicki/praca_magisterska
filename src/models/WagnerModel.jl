@@ -122,10 +122,12 @@ function oracle_subproblem(model::WagnerModel, kwargs)
 
     Z_float = value.(model.variables.Z)
 
+    Y = value.(model.variables.Y)
+
     #convert Z to a matrix of 0s and 1s
     Z = Z_float .> 0.5
     
-    σ = [findfirst(Z[i,:]) for i in 1:model.n]
+    σ = [findfirst(Z[:,i]) for i in 1:model.n]
 
     # solve subproblem using dynamic programming - top-down approach
     # initialize the dynamic programming table
@@ -261,13 +263,56 @@ function oracle_subproblem(model::WagnerModel, kwargs)
         # @show machine_2_time
     end
 
-    if machine_2_time != value_α
-        @warn("Solution is not feasible")
+    if !(machine_2_time ≈ value_α)
+        @error("Solution is not feasible")
         @show machine_2_time
         @show value_α
     end
 
 
+    @show λ1
+    @show sum(λ1) < model.Γ1
+    if sum(λ1) < model.Γ1
+        # select all the jobs that are not delayed, and sort them by Y value
+
+        number_of_jobs_to_delay = model.Γ1 - sum(λ1)
+
+        jobs_not_delayed = [i for i in 1:model.n if λ1[i] == 0]
+
+        Y_sum = [sum(Y[i, j] for j in 1:length(model.Λ)) for i in 1:model.n]
+
+        # select the number_of_jobs_to_delay jobs with the highest Y value
+        jobs_not_delayed = sort(jobs_not_delayed, by = i -> Y_sum[i], rev = true)[1:number_of_jobs_to_delay]
+
+        for i in jobs_not_delayed
+            λ1[i] = 1
+        end
+
+        println("λ1: ", λ1, " - essa")
+    end
+
+    @show λ2
+    @show sum(λ2) < model.Γ2
+    if sum(λ2) < model.Γ2
+        # select all the jobs that are not delayed, and sort them by X value 
+
+        number_of_jobs_to_delay = model.Γ2 - sum(λ2)
+
+        jobs_not_delayed = [i for i in 1:model.n if λ2[i] == 0]
+
+        #sum the X by column
+        sum_X = [sum(X[i, j] for j in 1:length(model.Λ)) for i in 1:model.n]
+
+        # select the number_of_jobs_to_delay jobs with the highest Y value
+
+        jobs_not_delayed = sort(jobs_not_delayed, by = i -> sum_X[i])[1:number_of_jobs_to_delay]
+
+        for i in jobs_not_delayed
+            λ2[i] = 1
+        end
+
+        println("λ2: ", λ2, " - essa")
+    end
 
     return value_α, (λ1, λ2)
 end
@@ -279,7 +324,7 @@ function find_permutation(model::WagnerModel)
     #convert Z to a matrix of 0s and 1s
     Z = Z_float .> 0.5
     
-    σ = [findfirst(Z[i,:]) for i in 1:model.n]
+    σ = [findfirst(Z[:,i]) for i in 1:model.n]
 
     return σ
 end
@@ -292,7 +337,7 @@ function oracle_subproblem_test(model::WagnerModel, kwargs)
     #convert Z to a matrix of 0s and 1s
     Z = Z_float .> 0.5
     
-    σ = [findfirst(Z[i,:]) for i in 1:model.n]
+    σ = [findfirst(Z[:,i]) for i in 1:model.n]
 
     # solve subproblem using dynamic programming - top-down approach
     # initialize the dynamic programming table
