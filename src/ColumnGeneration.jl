@@ -28,11 +28,14 @@ function column_generation(model::T; ϵ=10^-6, max_iterations=-1, timeout=7200, 
     UB = Inf
     v = 1
     iteration=0
+    permutation = []
 
     while (UB - LB) > ϵ
         @info "Iteration $iteration"
 
         @show model.model
+
+        @show length(model.Λ)
 
         # set timeout for CPLEX 
         if timeout != -1
@@ -40,6 +43,10 @@ function column_generation(model::T; ϵ=10^-6, max_iterations=-1, timeout=7200, 
         end
 
         optimize!(model.model)
+
+        permutation = find_permutation(model)
+
+        @show permutation
 
         if termination_status(model.model) != MOI.OPTIMAL
             @warn("Model is not optimal")
@@ -50,12 +57,12 @@ function column_generation(model::T; ϵ=10^-6, max_iterations=-1, timeout=7200, 
 
         LB = max(LB, y_opt)
 
-        value, λ = oracle_subproblem(model, kwargs)
+        value_subproblem, λ = oracle_subproblem(model, kwargs)
 
-        UB = min(UB, value)
+        UB = min(UB, value_subproblem)
 
-        push!(stats.LB, LB)
-        push!(stats.UB, UB)
+        push!(LB_vec, LB)
+        push!(UB_vec, UB)
         
 
         @show LB
@@ -63,6 +70,9 @@ function column_generation(model::T; ϵ=10^-6, max_iterations=-1, timeout=7200, 
         @show λ
 
         if (UB - LB) > ϵ
+            # if iteration == 2
+            #     λ = (trues(model.n), trues(model.n))
+            # end
             update_model!(model, [λ], LB)
         end
         iteration += 1
@@ -79,6 +89,6 @@ function column_generation(model::T; ϵ=10^-6, max_iterations=-1, timeout=7200, 
         end
     end
 
-    return ColumnGenerationStats(UB, permutation, (UB - LB) <= ϵ, stats.LB, stats.UB, iteration, solver_name, kwargs)
+    return ColumnGenerationStats(UB, permutation, (UB - LB) <= ϵ, LB_vec, UB_vec, iteration, solver_name, kwargs)
 
 end

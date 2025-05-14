@@ -8,10 +8,16 @@ using OffsetArrays
 using Random
 using Printf
 using Serialization
+using Match
+using MathOptInterface
 
 export AbstractColumnGenerationModel, AbstractBendersDecompositionModel, AbstractVariableRef
 
 export WagnerModel, WagnerModelBenders, SingleTardiness, SingleTardyJobsModel, MultiUnrelatedMakespan
+
+export TwoRPFPInstance, TwoRPFPInstanceReader
+
+export MultiUnrelatedInstanceReader
 
 export SingleMachineDueDates, MultiUnrelatedInstance
 
@@ -36,6 +42,10 @@ include("instances/Serializer.jl")
 include("instances/SingleMachineDueDates.jl")
 
 include("instances/MultiUnrelatedInstance.jl")
+
+include("instances/2RPFPInstance.jl")
+
+include("instances/MultiUnrelatedInstanceReader.jl")
 
 include("models/WagnerModel.jl")
 

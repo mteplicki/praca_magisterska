@@ -1,9 +1,7 @@
-struct TestModel{T} where T <: AbstractInstance
+struct TestModel{T<:AbstractInstance}
     name::String
     instance::T
     time::Float64
-    result_value::Float64
-    result_permutation
     result_stats::ColumnGenerationStats
     kwargs
 end
@@ -13,7 +11,7 @@ function test_model(model::T, kwargs...) where T <: AbstractColumnGenerationMode
 
     duration = @elapsed begin
         # solve the model
-        value, permutation, stats = column_generation(model, kwargs...)
+        stats = column_generation(model, kwargs...)
     end
 
     return TestModel(string(typeof(model)),model.instance, duration, value, permutation, stats, kwargs)
