@@ -43,18 +43,21 @@ function WagnerModel(optimizer, n::Int, p::Matrix{Float64}, phat::Matrix{Float64
     variables = WagnerModelVariables(Z, X, Y, y)
 
     # (5)
-    @constraint(model, [(λ, (δ1, δ2)) in enumerate(Λ)], sum(p[2,i]+ phat[2,i] * δ2[i] for i in 1:n) + sum(X[j, λ] for j in 1:n) <= y)
-
+    for (λ,(δ1, δ2)) in enumerate(Λ)
+        @constraint(model, sum(p[2,i]+ phat[2,i] * δ2[i] for i in 1:n) + sum(X[j, λ] for j in 1:n) <= y)
+    end
 
     # (6)
-    @constraint(model, [j in 1:(n-1), (λ, (δ1, δ2)) in enumerate(Λ)],
-        sum((p[1,i]+ phat[1,i] * δ1[i])*Z[i,j+1] for i in 1:n) + Y[j+1, λ] == 
-        sum((p[2,i]+ phat[2,i] * δ2[i])*Z[i,j] for i in 1:n) + X[j+1, λ] + Y[j, λ])
-
+    for (λ,(δ1, δ2)) in enumerate(Λ)
+        @constraint(model, [j in 1:(n-1)],
+            sum((p[1,i]+ phat[1,i] * δ1[i])*Z[i,j+1] for i in 1:n) + Y[j+1, λ] == 
+            sum((p[2,i]+ phat[2,i] * δ2[i])*Z[i,j] for i in 1:n) + X[j+1, λ] + Y[j, λ])
+    end
 
     # (7)
-    @constraint(model, [(λ, (δ1, δ2)) in enumerate(Λ)], sum((p[1,i]+ phat[1,i] * δ1[i])*Z[i,1] for i in 1:n) == X[1, λ])
-
+    for (λ,(δ1, δ2)) in enumerate(Λ)
+        @constraint(model, sum((p[1,i]+ phat[1,i] * δ1[i])*Z[i,1] for i in 1:n) == X[1, λ])
+    end
 
     # (8)
     @constraint(model, [j in 1:n], sum(Z[i,j] for i in 1:n) == 1)
@@ -62,8 +65,9 @@ function WagnerModel(optimizer, n::Int, p::Matrix{Float64}, phat::Matrix{Float64
     # (9)
     @constraint(model, [i in 1:n], sum(Z[i,j] for j in 1:n) == 1)
 
-    @constraint(model, [(λ, (δ1, δ2)) in enumerate(Λ)], Y[1, λ] == 0)
-
+    for (λ,(δ1, δ2)) in enumerate(Λ)
+        @constraint(model, Y[1, λ] == 0)
+    end
 
     return WagnerModel(TwoRPFPInstance(n,p,phat,Γ[1],Γ[2]),n, p, phat, Λ, variables, Γ1, Γ2, model)
 end
@@ -80,18 +84,31 @@ function update_model!(model::WagnerModel, new_Λ::Vector{Tuple{BitVector, BitVe
 
     # update constaints (5)-(7)
     
-    λ_old = length(model.Λ)
-    @constraint(model.model, [(λ, (δ1, δ2)) in enumerate(new_Λ)], sum(model.p[2,i]+ model.phat[2,i] * δ2[i] for i in 1:model.n) + sum(model.variables.X[j, λ + λ_old] for j in 1:model.n) <= model.variables.y)
+    λ = length(model.Λ) + 1
+    for (δ1, δ2) in new_Λ
+        @constraint(model.model, sum(model.p[2,i]+ model.phat[2,i] * δ2[i] for i in 1:model.n) + sum(model.variables.X[j, λ] for j in 1:model.n) <= model.variables.y)
+        λ += 1
+    end
 
-    @constraint(model.model, [j in 1:(model.n-1), (λ, (δ1, δ2)) in enumerate(new_Λ)],
-        sum((model.p[1,i]+ model.phat[1,i] * δ1[i])*model.variables.Z[i,j+1] for i in 1:model.n) + model.variables.Y[j+1, λ + λ_old] == 
-        sum((model.p[2,i]+ model.phat[2,i] * δ2[i])*model.variables.Z[i,j] for i in 1:model.n) + model.variables.X[j+1, λ + λ_old] + model.variables.Y[j, λ + λ_old])
+    λ = length(model.Λ) + 1
+    for (δ1, δ2) in new_Λ
+        @constraint(model.model, [j in 1:(model.n-1)],
+            sum((model.p[1,i]+ model.phat[1,i] * δ1[i])*model.variables.Z[i,j+1] for i in 1:model.n) + model.variables.Y[j+1, λ] == 
+            sum((model.p[2,i]+ model.phat[2,i] * δ2[i])*model.variables.Z[i,j] for i in 1:model.n) + model.variables.X[j+1, λ] + model.variables.Y[j, λ])
+        λ += 1
+    end
 
+    λ = length(model.Λ) + 1
+    for (δ1, δ2) in new_Λ
+        @constraint(model.model, sum((model.p[1,i]+ model.phat[1,i] * δ1[i])*model.variables.Z[i,1] for i in 1:model.n) == model.variables.X[1, λ])
+        λ += 1
+    end
 
-
-    @constraint(model.model, [(λ, (δ1, δ2)) in enumerate(new_Λ)], sum((model.p[1,i]+ model.phat[1,i] * δ1[i])*model.variables.Z[i,1] for i in 1:model.n) == model.variables.X[1, λ + λ_old])
-
-    @constraint(model.model, [(λ, (δ1, δ2)) in enumerate(new_Λ)], model.variables.Y[1, λ + λ_old] == 0)
+    λ = length(model.Λ) + 1
+    for (δ1, δ2) in new_Λ
+        @constraint(model.model, model.variables.Y[1, λ] == 0)
+        λ += 1
+    end
 
     # model.Λ = vcat(model.Λ, new_Λ)
     append!(model.Λ, new_Λ)
