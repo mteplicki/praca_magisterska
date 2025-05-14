@@ -269,9 +269,6 @@ function oracle_subproblem(model::WagnerModel, kwargs)
         @show value_α
     end
 
-
-    @show λ1
-    @show sum(λ1) < model.Γ1
     if sum(λ1) < model.Γ1
         # select all the jobs that are not delayed, and sort them by Y value
 
@@ -287,12 +284,8 @@ function oracle_subproblem(model::WagnerModel, kwargs)
         for i in jobs_not_delayed
             λ1[i] = 1
         end
-
-        println("λ1: ", λ1, " - essa")
     end
 
-    @show λ2
-    @show sum(λ2) < model.Γ2
     if sum(λ2) < model.Γ2
         # select all the jobs that are not delayed, and sort them by X value 
 
@@ -310,8 +303,6 @@ function oracle_subproblem(model::WagnerModel, kwargs)
         for i in jobs_not_delayed
             λ2[i] = 1
         end
-
-        println("λ2: ", λ2, " - essa")
     end
 
     return value_α, (λ1, λ2)
@@ -327,157 +318,4 @@ function find_permutation(model::WagnerModel)
     σ = [findfirst(Z[:,i]) for i in 1:model.n]
 
     return σ
-end
-
-function oracle_subproblem_test(model::WagnerModel, kwargs)
-    # Z is a permutation matrix. Transform it into a permutation vector
-
-    Z_float = value.(model.variables.Z)
-
-    #convert Z to a matrix of 0s and 1s
-    Z = Z_float .> 0.5
-    
-    σ = [findfirst(Z[:,i]) for i in 1:model.n]
-
-    # solve subproblem using dynamic programming - top-down approach
-    # initialize the dynamic programming table
-    α_offset = Array{Union{Missing, Float64}}(missing,2, model.n+1, model.n+2)
-
-
-    α = OffsetArray(α_offset, 1:2, 0:model.n, -1:model.n)
-
-    α[1:2, 0:model.n, -1] .= typemin(Float64)
-
-    α[1:2, 0, 0:model.n] .= 0
-
-    delay_array = [(0,0) for _ in α]
-
-    # r = 1
-    for k in 1:model.n
-        for γ in 0:model.Γ1
-            no_delay = model.p[1,σ[k]] + α[1,k-1,γ]
-            delay = model.p[1,σ[k]] + model.phat[1,σ[k]] + α[1,k-1,γ-1]
-            α[1,k,γ] = max(no_delay, delay)
-            if delay > no_delay
-                delay_array[1,k,γ] = (1,0)
-            end
-        end
-    end
-
-    @show "essa"
-    for k in 1:model.n
-        α[2,k,0] = model.p[2,σ[k]] + max(α[2,k-1,0], α[1,k,model.Γ1])
-        if α[2,k-1,0] > α[1,k,model.Γ1]
-            delay_array[2,k,0] = (0,0)
-        else
-            delay_array[2,k,0] = (0,1)
-        end
-        @show k
-        @show α[2,k,0]
-    end
-
-    for k in 1:model.n
-        for γ in 1:model.Γ2
-            @show k
-            @show γ
-            @show α[2,k-1,γ]
-            @show α[1,k,model.Γ1]
-            @show α[2,k-1,γ-1]
-            @show α[1,k,model.Γ1]
-            no_delay = model.p[2,σ[k]] + max(α[2,k-1,γ], α[1,k,model.Γ1])
-            delay = model.p[2,σ[k]] + model.phat[2,σ[k]] + max(α[2,k-1,γ-1], α[1,k,model.Γ1])
-            # @show delay
-            α[2,k,γ] = max(no_delay, delay)
-            if delay > no_delay
-                if α[2,k-1,γ-1] > α[1,k,model.Γ1]
-                    delay_array[2,k,γ] = (1,0)
-                else
-                    delay_array[2,k,γ] = (1,1)
-                end
-            else
-                if α[2,k-1,γ] > α[1,k,model.Γ1]
-                    delay_array[2,k,γ] = (0,0)
-                else
-                    delay_array[2,k,γ] = (0,1)
-                end
-            end
-        end
-    end
-
-    # @show delay_array
-
-    value_α = α[2,model.n,model.Γ2]
-
-    @show value_α
-
-    λ1 = falses(model.n)
-    λ2 = falses(model.n)
-
-    γ = model.Γ2
-
-    starting_point = -1
-
-    for k in model.n:-1:1
-        @show k
-        @show σ[k]
-        @show delay_array[2,k,γ]
-        @show γ
-        @show starting_point
-        if delay_array[2,k,γ] == (1,0)
-            λ2[σ[k]] = 1
-            γ -= 1
-        elseif delay_array[2,k,γ] == (1,1)
-            λ2[σ[k]] = 1
-            if starting_point == -1
-                starting_point = k
-            end
-            γ -= 1
-        elseif delay_array[2,k,γ] == (0,1) && starting_point == -1
-            starting_point = k
-        end
-    end
-
-    γ = model.Γ1
-    for k in (starting_point):-1:1
-        @show k
-        @show σ[k]
-        @show delay_array[1,k,γ]
-        @show γ
-        if delay_array[1,k,γ] == (1,0)
-            λ1[σ[k]] = 1
-            γ -= 1
-        end
-    end
-
-    @show λ1
-    @show λ2
-
-    # check if the solution λ1, λ2 is feasible
-    machine_1_time = 0.
-    machine_2_time = 0.
-    for k in 1:model.n
-        @show k
-        @show λ1[σ[k]]
-        if λ1[σ[k]] == 1
-            machine_1_time += model.p[1,σ[k]] + model.phat[1,σ[k]]
-        else
-            machine_1_time += model.p[1,σ[k]]
-        end
-        @show machine_1_time
-        @show λ2[σ[k]]
-        if λ2[σ[k]] == 1
-            machine_2_time = max(machine_2_time, machine_1_time) + model.p[2,σ[k]] + model.phat[2,σ[k]]
-        else
-            machine_2_time = max(machine_2_time, machine_1_time) + model.p[2,σ[k]]
-        end
-        @show machine_2_time
-    end
-
-    if machine_2_time != value_α
-        @warn("Solution is not feasible")
-        @show machine_2_time
-        @show value_α
-    end
-
-    return α, delay_array, value_α, (λ1, λ2)
 end
