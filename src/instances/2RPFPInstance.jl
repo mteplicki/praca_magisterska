@@ -1,4 +1,4 @@
-struct TwoRPFPInstance
+struct TwoRPFPInstance <: AbstractInstance
     n::Int
     p::Matrix{Float64}
     phat::Matrix{Float64}

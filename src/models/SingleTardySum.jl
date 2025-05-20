@@ -55,7 +55,7 @@ function update_model!(model::SingleTardiness, new_Λ::Vector{BitVector}, LB::Fl
     @constraint(model.model, [k in 1:model.n, (λ, δ) in enumerate(new_Λ)], 
         sum((model.p[i] + model.phat[i] * δ[i]) * sum(x[i,u] for u in 1:k) for i in 1:model.n) - sum(model.d[i]* x[i,k] for i in 1:model.n) <= t[k,λ_old+λ])
     append!(model.Λ, new_Λ)
-    @constraint(model.model, z >= LB)
+    # @constraint(model.model, z >= LB)
     return model
 end
 
@@ -121,19 +121,11 @@ function check_worst_case(model::SingleTardiness, σ::Vector{Int}, δ::BitVector
     end
 end
 
-function oracle_subproblem(model::SingleTardiness, kwargs)
-    x = value.(model.variables.x)
+function oracle_subproblem(model::SingleTardiness, permutation, kwargs)
     r = zeros(Int, model.n)
 
     # create a permutation of the jobs based on the x variables
-    σ = zeros(Int, model.n)
-    for i in 1:model.n
-        for k in 1:model.n
-            if x[i,k] == 1
-                σ[k] = i
-            end
-        end
-    end
+    σ = permutation
 
     #check if in kwargs is a key "subproblem" and if it is equal to 1
     worst_value, δ = if haskey(kwargs, :subproblem_method) && kwargs[:subproblem_method] == 2
@@ -323,6 +315,7 @@ end
 
 function find_permutation(model::SingleTardiness)
     x = value.(model.variables.x)
+    x = x .> 0.5
     # create a permutation of the jobs based on the x variables
     σ = zeros(Int, model.n)
     for i in 1:model.n
@@ -333,4 +326,11 @@ function find_permutation(model::SingleTardiness)
         end
     end
     return σ
+end
+
+save_permutation_variable(model::SingleTardiness) = value.(model.variables.x)
+set_start_value_for_model(model::SingleTardiness, permutation_variable) = begin
+    if !isnothing(permutation_variable)
+        set_start_value.(model.variables.x, permutation_variable)
+    end
 end

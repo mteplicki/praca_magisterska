@@ -25,6 +25,8 @@ export SingleTardinessDominanceRules
 
 export column_generation, benders_decomposition
 
+export save_instance, load_instance
+
 abstract type AbstractColumnGenerationModel end
 abstract type AbstractBendersDecompositionModel end
 

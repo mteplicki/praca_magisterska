@@ -1,4 +1,5 @@
 {
     "julia.inlayHints.static.enabled": true,
-    "julia.lint.missingrefs": "all"
+    "julia.lint.missingrefs": "all",
+    "terminal.integrated.scrollback": 99999
 }

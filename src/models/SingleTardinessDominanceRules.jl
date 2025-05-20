@@ -128,26 +128,19 @@ function update_model!(model::SingleTardinessDominanceRules, new_Λ::Vector{BitV
     @constraint(model.model, [k in 1:model.n, (λ, δ) in enumerate(new_Λ)], 
     sum((p[i] + phat[i] * δ[i]) * sum(x[i][u] for u in length(B[i]):min(k, n-length(A[i]))) for i in 1:n) - sum(d[i]* x[i][k] for i in feasible_substraction_set[k]) <= t[k,λ_old+λ])
     append!(model.Λ, new_Λ)
-    @constraint(model.model, z >= LB)
+    # @constraint(model.model, z >= LB)
     return model
 end
 
-function oracle_subproblem(model::SingleTardinessDominanceRules, kwargs)
-    x = [value.(model.variables.x[i]) for i in 1:model.n]
+function oracle_subproblem(model::SingleTardinessDominanceRules, permutation, kwargs)
+
     r = zeros(Int, model.n)
     A = model.variables.A
     B = model.variables.B
     n = model.n
 
     # create a permutation of the jobs based on the x variables
-    σ = zeros(Int, n)
-    for i in 1:n
-        for k in (length(B[i])+1):(n-length(A[i]))
-            if x[i][k] == 1
-                σ[k] = i
-            end
-        end
-    end
+    σ = permutation
 
     #check if in kwargs is a key "subproblem" and if it is equal to 1
     worst_value, δ = if haskey(kwargs, :subproblem_method) && kwargs[:subproblem_method] == 2
@@ -174,9 +167,14 @@ end
 function find_permutation(model::SingleTardinessDominanceRules)
     # find the permutation of the jobs based on the x variables
     σ = zeros(Int, model.n)
+
+    x = value.(model.variables.x)
+
+    x = x .> 0.5
+
     for i in 1:model.n
         for k in (length(model.variables.B[i])+1):(model.n-length(model.variables.A[i]))
-            if model.variables.x[i][k] == 1
+            if x[i][k] == 1
                 σ[k] = i
             end
         end

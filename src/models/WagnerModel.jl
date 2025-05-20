@@ -117,17 +117,10 @@ function update_model!(model::WagnerModel, new_Λ::Vector{Tuple{BitVector, BitVe
 end
 
 
-function oracle_subproblem(model::WagnerModel, kwargs)
+function oracle_subproblem(model::WagnerModel, permutation, kwargs)
     # Z is a permutation matrix. Transform it into a permutation vector
-
-    Z_float = value.(model.variables.Z)
-
-    Y = value.(model.variables.Y)
-
-    #convert Z to a matrix of 0s and 1s
-    Z = Z_float .> 0.5
     
-    σ = [findfirst(Z[:,i]) for i in 1:model.n]
+    σ = permutation
 
     # solve subproblem using dynamic programming - top-down approach
     # initialize the dynamic programming table
@@ -318,4 +311,12 @@ function find_permutation(model::WagnerModel)
     σ = [findfirst(Z[:,i]) for i in 1:model.n]
 
     return σ
+end
+
+save_permutation_variable(model::WagnerModel) = value.(model.variables.Z)
+
+function set_start_value_for_model(model::WagnerModel, permutation)
+    if !isnothing(permutation)
+        set_start_value.(model.variables.Z, permutation)
+    end
 end

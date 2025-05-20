@@ -94,7 +94,7 @@ function update_model!(model::SingleTardyJobsModel, new_Λ::Vector{BitVector}, L
         λ += 1
     end
 
-    @constraint(model.model, y >= LB)
+    # @constraint(model.model, y >= LB)
 
     append!(model.Λ, new_Λ)
     
@@ -140,13 +140,8 @@ function find_job_permutation(x_matrix)
     return job_sequence  # The job permutation
 end
 
-function oracle_subproblem(model::SingleTardyJobsModel, kwargs)
-    Z_value = value.(model.variables.Z)
-    # @show Z_value
-    Z = BitArray(Z_value .== 1.0)
-    # @show Z
-
-    σ = find_job_permutation(Z)
+function oracle_subproblem(model::SingleTardyJobsModel, permutation, kwargs)
+    σ = permutation
 
     value_worst_case, δ = if haskey(kwargs, :subproblem_method) && kwargs[:subproblem_method] == 2
         oracle_subproblem2(model, σ)
@@ -433,6 +428,7 @@ end
 
 function find_permutation(model::SingleTardyJobsModel)
     Z = value.(model.variables.Z)
+    Z = Z .> 0.5
     n = model.n
     σ = zeros(Int, n)
     for i in 1:n

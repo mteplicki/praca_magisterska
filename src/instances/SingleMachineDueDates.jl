@@ -28,3 +28,7 @@ function SingleMachineDueDates(n::Int, R::Float64, T::Float64, G::Float64)
     
 end
 
+function summary(instance::SingleMachineDueDates)
+    return "SingleMachineDueDates(n=$(instance.n), r=$(instance.r), d=$(instance.d), Γ=$(instance.Γ))"
+end
+
