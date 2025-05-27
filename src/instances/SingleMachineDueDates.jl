@@ -17,18 +17,17 @@ function SingleMachineDueDates(n::Int, R::Float64, T::Float64, G::Float64)
 
     p = rand(p_min:p_max, n)
 
-    phat = [rand(floor(p_i * 2 /G):ceil(p_i * 7 /G)) for p_i in p]
+    phat = [rand(ceil(p_i * 2 /G):ceil(p_i * 7 /G)) for p_i in p]
 
     P = sum(p)
 
-    d = rand(floor(P*(1-T-R/2)):ceil(P*(1-T+R/2)), n)
+    d = rand(max(ceil(P*(1-T-R/2)),0):ceil(P*(1-T+R/2)), n)
 
-    Γ = rand(floor(5*10^-3*G*n):ceil(9*10^-3*G*n))
+    Γ = rand(ceil(5*10^-3*G*n):ceil(9*10^-3*G*n))
 
     r = zeros(Int, n)
 
     return SingleMachineDueDates(n, p, phat, r, d, Γ, R, T, G)
-    
 end
 
 function summary(instance::SingleMachineDueDates)

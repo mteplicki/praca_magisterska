@@ -121,3 +121,45 @@ function test_instances(dir_instances::String, optimizer; kwargs...)
     # return the result
     return test_model_list, error_files
 end
+
+function load_results(dir_results::String)
+    # read all files in the directory
+    files = readdir(dir_results)
+    # filter files that end with .bin
+    results_files = filter(x -> occursin(".bin", x), files)
+    # create a list to store the results
+    results = []
+    for file in results_files
+        path = joinpath(dir_results, file)
+        @show "Loading results from file: $path"
+        # Open the file for reading
+        open(path, "r") do io
+            # Deserialize the file
+            res = deserialize(io)
+            push!(results, res)
+        end
+    end
+    return results
+end
+
+function results_MultiUnrelatedMakespan_to_dataframe(results::Vector{TestModel})
+    # Convert the results to a DataFrame
+    df = DataFrame(
+        name = [res.name for res in results],
+        time = [res.time for res in results],
+        G = [res.instance.G for res in results],
+        n = [res.instance.n for res in results],
+        m = [res.instance.m for res in results],
+        Γ = [res.instance.Γ for res in results],
+        p_min = [res.instance.p_min for res in results],
+        p_max = [res.instance.p_max for res in results],
+        res = [res.result_stats for res in results],
+        optimizer = [res.result_stats.optimizer for res in results],
+        kwargs = [res.kwargs for res in results],
+        optimality = [res.result_stats.optimality for res in results],
+        iterations = [res.result_stats.iterations for res in results],
+        LB = [res.result_stats.LB for res in results],
+        UB = [res.result_stats.UB for res in results]
+    )
+    return df
+end

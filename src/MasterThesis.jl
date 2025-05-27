@@ -11,6 +11,7 @@ using Serialization
 using Match
 using MathOptInterface
 using Dates
+using DataFrames
 
 export AbstractColumnGenerationModel, AbstractBendersDecompositionModel, AbstractVariableRef
 

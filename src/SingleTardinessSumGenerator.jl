@@ -16,7 +16,7 @@ function generate_instances(dir::AbstractString, k::Int, n::Int, R::Float64, T::
     end
 end
 
-dir = "./instances/single_tardiness_sum"
+dir = "./instances/single_tardiness_sum_poprawione"
 
 for n = [20,40,60]
     for R = [0.2,0.6,1.0]
@@ -29,8 +29,8 @@ for n = [20,40,60]
 end
 
 #create file model_type with the content "SingleTardyJobs"
-open("./instances/single_tardiness_sum/model_type", "w") do f
-    write(f, "SingleTardyJobs")
+open(dir*"/model_type", "w") do f
+    write(f, "SingleSumOfTardiness")
 end
 
 
