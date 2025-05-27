@@ -34,3 +34,7 @@ end
 function summary(instance::MultiUnrelatedInstance)
     return "MultiUnrelatedInstance(n=$(instance.n), m=$(instance.m), Γ=$(instance.Γ), p_min=$(instance.p_min), p_max=$(instance.p_max), G=$(instance.G))"
 end
+
+function Base.show(io::IO, instance::MultiUnrelatedInstance)
+    print(io, summary(instance))
+end

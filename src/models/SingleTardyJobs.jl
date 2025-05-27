@@ -19,12 +19,20 @@ struct SingleTardyJobsModel <: AbstractColumnGenerationModel
     model::Model
 end
 
-SingleTardyJobsModel(optimizer, instance::SingleMachineDueDates) = SingleTardyJobsModel(optimizer,instance.n, instance.p, instance.phat, instance.d, instance.Γ)
+function SingleTardyJobsModel(optimizer, instance::SingleMachineDueDates) 
 
-SingleTardyJobsModel(optimizer,n::Int, p::Vector{Int}, phat::Vector{Int}, d::Vector{Int}, Γ::Int) = SingleTardyJobsModel(optimizer,n, p, phat, d, Γ, ones(Int, n))
+    n = instance.n
+    p = instance.p
+    phat = instance.phat
+    d = instance.d
+    Γ = instance.Γ
+    r = instance.r
 
-function SingleTardyJobsModel(optimizer, n::Int, p::Vector{Int}, phat::Vector{Int}, d::Vector{Int}, Γ::Int, w::Vector{Int})
+    w = ones(n)
+
     model = Model(optimizer)
+
+    r = zeros(Int, n)
 
     Λ = [falses(n)]
 
@@ -59,7 +67,7 @@ function SingleTardyJobsModel(optimizer, n::Int, p::Vector{Int}, phat::Vector{In
 
     @constraint(model, [(λ, δ) in enumerate(Λ)], sum(w[j]*U[j,λ] for j in 1:n) <= y)
 
-    return SingleTardyJobsModel(SingleMachineDueDates(n,p,phat,r,d,Γ),n, p, phat, d, Γ, w, Λ, M, SingleTardyJobsVariables(Z,S,U,y), model)
+    return SingleTardyJobsModel(instance,n, p, phat, d, Γ, w, Λ, M, SingleTardyJobsVariables(Z,S,U,y), model)
 end
 
 

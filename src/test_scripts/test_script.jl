@@ -2,11 +2,11 @@ struct TestModel{T<:AbstractInstance}
     name::String
     instance::T
     time::Float64
-    result_stats::ColumnGenerationStats
+    result_stats
     kwargs
 end
 
-function test_model(model::T, kwargs...) where T <: AbstractColumnGenerationModel
+function test_model(model::T; kwargs...) where T <: AbstractColumnGenerationModel
     # test the model with column_generation
 
     duration = @elapsed begin
@@ -17,7 +17,7 @@ function test_model(model::T, kwargs...) where T <: AbstractColumnGenerationMode
     return TestModel(string(typeof(model)),model.instance, duration, stats, kwargs)
 end
 
-function test_instances(dir_instances::String, optimizer)
+function test_instances(dir_instances::String, optimizer; kwargs...)
     # Get all files in the directory
     files = readdir(dir_instances)
     # for every file in the directory
@@ -45,7 +45,7 @@ function test_instances(dir_instances::String, optimizer)
     error_files = []
     
     for file in files
-        try
+        # try
             # Check if the file is a .jl file
             # Load the instance
         
@@ -65,15 +65,15 @@ function test_instances(dir_instances::String, optimizer)
             # @show instance
             # Create the model
             model = @match model_type begin
-                "MultiUnrelatedMakespan" => MultiUnrelatedMakespan(optimizer, instance)
-                "SingleTardyJobs" => SingleTardyJobsModel(optimizer, instance)
-                "SingleTardinessDominanceRules" => SingleTardinessDominanceRules(optimizer, instance)
-                "SingleMachineDueDates" => SingleMachineDueDates(optimizer, instance)
-                "2RPFP" => WagnerModel(optimizer, instance)
+                "MultiUnrelatedMakespan" => MultiUnrelatedMakespan(optimizer(), instance)
+                "SingleTardyJobs" => SingleTardyJobsModel(optimizer(), instance)
+                "SingleTardinessDominanceRules" => SingleTardinessDominanceRules(optimizer(), instance)
+                "SingleSumOfTardiness" => SingleTardiness(optimizer(), instance)
+                "2RPFP" => WagnerModel(optimizer(), instance)
             end
             # @show model
             # Test the model
-            res_test_model = test_model(model)
+            res_test_model = test_model(model; kwargs...)
             # Save the result
             push!(test_model_list, res_test_model)
 
@@ -89,13 +89,13 @@ function test_instances(dir_instances::String, optimizer)
                 serialize(io, res_test_model)
             end
     
-        catch e
-            @error "Error in file $file: $(e)"
-            # Add the file to the error list
-            push!(error_files, file)
-            # continue to the next file
-            continue
-        end     
+        # catch e
+        #     @error "Error in file $file: $(e)"
+        #     # Add the file to the error list
+        #     push!(error_files, file)
+        #     # continue to the next file
+        #     continue
+        # end     
     end
 
     @show test_model_list

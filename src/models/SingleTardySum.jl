@@ -16,10 +16,17 @@ struct SingleTardiness <: AbstractColumnGenerationModel
     model::Model
 end
 
-SingleTardiness(optimizer, instance::SingleMachineDueDates) = SingleTardiness(optimizer, instance.n, instance.p, instance.phat, instance.d, instance.Γ)
+function SingleTardiness(optimizer, instance::SingleMachineDueDates) 
 
-function SingleTardiness(optimizer, n::Int, p::Vector{Int}, phat::Vector{Int}, d::Vector{Int}, Γ::Int)
-    model = Model(optimizer)
+    n = instance.n
+    p = instance.p
+    phat = instance.phat
+    r = instance.r
+    d = instance.d
+    Γ = instance.Γ
+
+
+    model = direct_model(optimizer)
 
     Λ = [falses(n)]
 
@@ -40,7 +47,7 @@ function SingleTardiness(optimizer, n::Int, p::Vector{Int}, phat::Vector{Int}, d
 
     @objective(model, Min, z)
 
-    return SingleTardiness(SingleMachineDueDates(n,p,phat,r,d,Γ),n, p, phat, d, Γ, SingleTardinessVariables(x,t,z), Λ, model)
+    return SingleTardiness(instance,n, p, phat, d, Γ, SingleTardinessVariables(x,t,z), Λ, model)
 end
 
 function update_model!(model::SingleTardiness, new_Λ::Vector{BitVector}, LB::Float64)
@@ -134,14 +141,31 @@ function oracle_subproblem(model::SingleTardiness, permutation, kwargs)
         oracle_subproblem_single_tardiness1(model.n, model.Γ, model.p, model.phat, model.d ,σ)
     end
 
-    if haskey(kwargs, :subproblem_method) && kwargs[:subproblem_method] == 2
-        worst_value_second, δ_second = oracle_subproblem_single_tardiness1(model.n, model.Γ, model.p, model.phat, model.d ,σ)
-        if worst_value_second != worst_value
-            @warn "Expected value $worst_value, got $worst_value_second"
-            @info "δ: $δ"
-            @info "δ_second: $δ_second"
+    if haskey(kwargs, :check_with_second_method) && kwargs[:check_with_second_method]
+        if haskey(kwargs, :subproblem_method) && kwargs[:subproblem_method] == 2
+            worst_value_second, δ_second = oracle_subproblem_single_tardiness1(model.n, model.Γ, model.p, model.phat, model.d ,σ)
+            if worst_value_second != worst_value
+                @error "Expected value $worst_value, got $worst_value_second"
+                @info "δ: $δ"
+                @info "δ_second: $δ_second"
+            else
+                @info "Values are equal: $worst_value == $worst_value_second"
+            end
+        end
+
+        if haskey(kwargs, :subproblem_method) && kwargs[:subproblem_method] == 1
+            worst_value_second, δ_second = oracle_subproblem_single_tardiness2(model.n, model.Γ, model.p, model.phat, model.d ,σ)
+            if worst_value_second != worst_value
+                @error "Expected value $worst_value, got $worst_value_second"
+                @info "δ: $δ"
+                @info "δ_second: $δ_second"
+            else
+                @info "Values are equal: $worst_value == $worst_value_second"
+            end
         end
     end
+
+
 
     check_worst_case(model, σ, δ, worst_value)
 
@@ -149,6 +173,9 @@ function oracle_subproblem(model::SingleTardiness, permutation, kwargs)
 end
 
 function oracle_subproblem_single_tardiness1(n, Γ, p, phat, d, σ::Vector{Int})
+
+    println("Opcja nr. 1")
+
     p = p[σ]
     phat = phat[σ]
     d = d[σ]
@@ -206,6 +233,8 @@ function oracle_subproblem_single_tardiness1(n, Γ, p, phat, d, σ::Vector{Int})
 end
 
 function oracle_subproblem_single_tardiness2(n, Γ, p, phat, d, σ::Vector{Int})
+
+    println("Opcja nr. 2")
     
     p = p[σ]
     phat = phat[σ]
@@ -243,7 +272,7 @@ function oracle_subproblem_single_tardiness2(n, Γ, p, phat, d, σ::Vector{Int})
     max_value_args = (-1, 0,-1)
     for k in 2:n
         k_last = k-1
-        for γ in 1:model.Γ
+        for γ in 1:Γ
             for Θ in 0:Φ_hat
                 if Θ - phat[k] < 0
                     if !set_α[k-1,γ,Θ]
@@ -328,9 +357,14 @@ function find_permutation(model::SingleTardiness)
     return σ
 end
 
-save_permutation_variable(model::SingleTardiness) = value.(model.variables.x)
+save_permutation_variable(model::SingleTardiness) = (value.(model.variables.x), value.(model.variables.t), value(model.variables.z))
 set_start_value_for_model(model::SingleTardiness, permutation_variable) = begin
     if !isnothing(permutation_variable)
-        set_start_value.(model.variables.x, permutation_variable)
+        x = permutation_variable[1]
+        t = permutation_variable[2]
+        z = permutation_variable[3]
+        set_start_value.(model.variables.x, x)
+        set_start_value.(model.variables.t[1:model.n,1:(end-1)], t)
+        set_start_value.(model.variables.z, z)
     end
 end

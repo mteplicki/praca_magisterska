@@ -10,15 +10,31 @@ struct ColumnGenerationStats
     kwargs
 end
 
+struct ColumnGenerationStatsExtended
+    res::Float64
+    permutation
+    optimality::Bool
+    LB::Vector{Float64}
+    UB::Vector{Float64}
+    iterations::Int
+    optimizer::String
+    time::Float64
+    MP_time::Vector{Float64}
+    AP_time::Vector{Float64}
+    kwargs
+end
+
 function column_generation(model::T; ϵ=10^-6, max_iterations=-1, timeout=7200, kwargs...) where T <: AbstractColumnGenerationModel
     time_start = time()
     # Pobieramy "prawdziwy" optymalizator spod warstw mostów
-    optimizer = backend(model.model).optimizer
-    while optimizer isa MathOptInterface.AbstractOptimizer && hasproperty(optimizer, :model)
-        optimizer = optimizer.model
-    end
+    # optimizer = backend(model.model).optimizer
+    # while optimizer isa MathOptInterface.AbstractOptimizer && hasproperty(optimizer, :model)
+    #     optimizer = optimizer.model
+    # end
 
-    solver_name = string(typeof(optimizer))
+    # solver_name = string(typeof(optimizer))
+
+    solver_name = "CPLEX.Optimizer" # Placeholder, replace with actual solver name extraction logic
 
     LB_vec = Float64[]
     UB_vec = Float64[]
@@ -31,12 +47,18 @@ function column_generation(model::T; ϵ=10^-6, max_iterations=-1, timeout=7200, 
     iteration=0
     permutation = []
 
+    MP_time = Float64[]
+    AP_time = Float64[]
+
     permutation_variable = nothing
 
     while (UB - LB) > ϵ
         @info "Iteration $iteration"
 
-        println(summary(model.instance))
+        #show current time
+        @info "Current time: $(now())"
+
+        println(model.instance)
 
         @show model.model
 
@@ -53,9 +75,14 @@ function column_generation(model::T; ϵ=10^-6, max_iterations=-1, timeout=7200, 
             set_optimizer_attribute(model.model, "CPXPARAM_TimeLimit",time_left)
         end
 
+        #set memory limit for CPLEX
+
+        set_optimizer_attribute(model.model, "CPXPARAM_MIP_Limits_TreeMemory", 6144)
+
         set_start_value_for_model(model, permutation_variable)
 
-        optimize!(model.model)
+        time_MP = @elapsed optimize!(model.model)
+        push!(MP_time, time_MP)
 
         permutation = find_permutation(model)
 
@@ -66,14 +93,18 @@ function column_generation(model::T; ϵ=10^-6, max_iterations=-1, timeout=7200, 
         if termination_status(model.model) != MOI.OPTIMAL
             @warn("Model is not optimal")
             time_elapsed = time() - time_start
-            return ColumnGenerationStats(UB, [], false, LB_vec, UB_vec, iteration, solver_name, time_elapsed, kwargs)
+
+            return ColumnGenerationStatsExtended(UB, [], false, LB_vec, UB_vec, iteration, solver_name, time_elapsed, MP_time, AP_time, kwargs)
         end
 
         y_opt = objective_value(model.model)
 
         LB = max(LB, y_opt)
 
-        value_subproblem, λ = oracle_subproblem(model, permutation, kwargs)
+        time_AP = @elapsed value_subproblem, λ = oracle_subproblem(model, permutation, kwargs)
+
+        push!(AP_time, time_AP)
+        println("Oracle time: $time_AP")
 
         UB = min(UB, value_subproblem)
 
@@ -117,6 +148,6 @@ function column_generation(model::T; ϵ=10^-6, max_iterations=-1, timeout=7200, 
     @show kwargs
     @show time_elapsed
 
-    return ColumnGenerationStats(UB, permutation, (UB - LB) <= ϵ, LB_vec, UB_vec, iteration, solver_name, time_elapsed, kwargs)
+    return ColumnGenerationStatsExtended(UB, permutation, (UB - LB) <= ϵ, LB_vec, UB_vec, iteration, solver_name, time_elapsed, MP_time, AP_time, kwargs)
 
 end

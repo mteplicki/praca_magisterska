@@ -5,6 +5,9 @@ struct SingleMachineDueDates <: AbstractInstance
     r::Vector{Int}
     d::Vector{Int}
     Γ::Int
+    R::Float64
+    T::Float64
+    G::Float64
 end
 
 
@@ -24,11 +27,15 @@ function SingleMachineDueDates(n::Int, R::Float64, T::Float64, G::Float64)
 
     r = zeros(Int, n)
 
-    return SingleMachineDueDates(n, p, phat, r, d, Γ)
+    return SingleMachineDueDates(n, p, phat, r, d, Γ, R, T, G)
     
 end
 
 function summary(instance::SingleMachineDueDates)
-    return "SingleMachineDueDates(n=$(instance.n), r=$(instance.r), d=$(instance.d), Γ=$(instance.Γ))"
+    return "SingleMachineDueDates(n=$(instance.n), r=$(instance.r), d=$(instance.d), Γ=$(instance.Γ), R=$(instance.R), T=$(instance.T), G=$(instance.G))"
+end
+
+function Base.show(io::IO, instance::SingleMachineDueDates)
+    print(io, summary(instance))
 end
 
