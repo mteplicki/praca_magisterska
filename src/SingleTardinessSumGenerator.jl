@@ -19,8 +19,18 @@ end
 dir = "./instances/single_tardiness_sum_poprawione"
 
 for n = [20,40,60]
-    for R = [0.2,0.6,1.0]
-        for T = [0.2,0.6,0.8]
+    for R = [1.0]
+        for T = [0.6,0.8]
+            for G = [10., 100.]
+                generate_instances(dir, 5, n, R, T, G)
+            end
+        end
+    end
+end
+
+for n = [20,40,60]
+    for R = [0.6]
+        for T = [0.8]
             for G = [10., 100.]
                 generate_instances(dir, 5, n, R, T, G)
             end
