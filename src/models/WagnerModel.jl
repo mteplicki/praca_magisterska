@@ -21,7 +21,7 @@ WagnerModel(optimizer, instance::TwoRPFPInstance) = WagnerModel(optimizer, insta
 
 
 function WagnerModel(optimizer, n::Int, p::Matrix{Float64}, phat::Matrix{Float64}, Γ::Tuple{Int, Int})
-    model = Model(optimizer)
+    model = direct_model(optimizer)
 
     Λ = [(falses(n), falses(n))]
 
@@ -261,6 +261,9 @@ function oracle_subproblem(model::WagnerModel, permutation, kwargs)
         @show machine_2_time
         @show value_α
     end
+
+    Y = value.(model.variables.Y)
+    X = value.(model.variables.X)
 
     if sum(λ1) < model.Γ1
         # select all the jobs that are not delayed, and sort them by Y value
