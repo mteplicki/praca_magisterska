@@ -13,6 +13,8 @@ using MathOptInterface
 using Dates
 using DataFrames
 
+export TestModel
+
 export AbstractColumnGenerationModel, AbstractBendersDecompositionModel, AbstractVariableRef
 
 export WagnerModel, WagnerModelBenders, SingleTardiness, SingleTardyJobsModel, MultiUnrelatedMakespan
