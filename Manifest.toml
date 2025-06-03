@@ -2,7 +2,7 @@
 
 julia_version = "1.11.5"
 manifest_format = "2.0"
-project_hash = "414214843d3b7628facaf93fe4bce1029f5a8b4b"
+project_hash = "14c2b5fe1f1ebd416ec98176494efaa03b120158"
 
 [[deps.ArgTools]]
 uuid = "0dad84c5-d112-42e6-8d28-ef12dabb789f"
@@ -38,6 +38,12 @@ deps = ["CEnum", "Libdl", "MathOptInterface", "SparseArrays"]
 git-tree-sha1 = "36590867625f14e47196678cd2028b0956e2101d"
 uuid = "a076750e-1247-5638-91d2-ce28b192dca0"
 version = "1.1.1"
+
+[[deps.CSV]]
+deps = ["CodecZlib", "Dates", "FilePathsBase", "InlineStrings", "Mmap", "Parsers", "PooledArrays", "PrecompileTools", "SentinelArrays", "Tables", "Unicode", "WeakRefStrings", "WorkerUtilities"]
+git-tree-sha1 = "deddd8725e5e1cc49ee205a1964256043720a6c3"
+uuid = "336ed68f-0bac-5ca0-87d4-7b16caf5d00b"
+version = "0.10.15"
 
 [[deps.CodecBzip2]]
 deps = ["Bzip2_jll", "TranscodingStreams"]
@@ -567,6 +573,17 @@ version = "1.11.0"
 [[deps.Unicode]]
 uuid = "4ec0a83e-493e-50e2-b9ac-8f72acf5a8f5"
 version = "1.11.0"
+
+[[deps.WeakRefStrings]]
+deps = ["DataAPI", "InlineStrings", "Parsers"]
+git-tree-sha1 = "b1be2855ed9ed8eac54e5caff2afcdb442d52c23"
+uuid = "ea10d353-3f73-51f8-a26c-33c1cb351aa5"
+version = "1.4.2"
+
+[[deps.WorkerUtilities]]
+git-tree-sha1 = "cd1659ba0d57b71a464a29e64dbc67cfe83d54e7"
+uuid = "76eceee3-57b5-4d4a-8e66-0e911cebbf60"
+version = "1.6.1"
 
 [[deps.Zlib_jll]]
 deps = ["Libdl"]

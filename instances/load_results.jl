@@ -124,3 +124,61 @@ function load_MultiUnrelatedMakespanResults(dir::AbstractString)
     df = filter(row -> !isapprox(row.m,row.n * 0.4), df)
     df
 end
+
+function TwoRPFPToDataFrame(results::Vector)
+    df = DataFrame([
+        "name" => String[],
+        "n" => Int[],
+        "Γ1" => Float64[],
+        "Γ2" => Float64[],
+        "uncertainty" => Float64[],
+        "time" => Float64[],
+        "res" => Float64[],
+        "optimality" => Bool[],
+        "iterations" => Int[],
+        "LB" => String[],
+        "UB" => String[],
+        "first_LB" => Float64[],
+        "first_UB" => Float64[],
+        "last_LB" => Float64[],
+        "last_UB" => Float64[]
+    ])
+    for result in results
+        row = Dict(
+            "name" => result.name,
+            "n" => result.instance.n,
+            "Γ1" => result.instance.Γ1,
+            "Γ2" => result.instance.Γ2,
+            "uncertainty" => result.instance.phat[1,1] / result.instance.p[1,1],
+            "time" => result.time,
+            "res" => result.result_stats.res,
+            "optimality" => result.result_stats.optimality,
+            "iterations" => result.result_stats.iterations,
+            "LB" => string(result.result_stats.LB),
+            "UB" => string(result.result_stats.UB),
+                        "first_LB" => if isempty(result.result_stats.LB)
+                0
+            else
+                first(result.result_stats.LB)
+            end,
+            "first_UB" => if isempty(result.result_stats.UB)
+                0
+            else
+                first(result.result_stats.UB)
+            end,
+            "last_LB" => if isempty(result.result_stats.LB)
+                Inf
+            else
+                last(result.result_stats.LB)
+            end,
+            "last_UB" => if isempty(result.result_stats.UB)
+                Inf
+            else
+                last(result.result_stats.UB)
+            end
+        )
+        @show row
+        push!(df, row)
+    end
+    return df
+end
