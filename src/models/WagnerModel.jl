@@ -262,44 +262,44 @@ function oracle_subproblem(model::WagnerModel, permutation, kwargs)
         @show value_α
     end
 
-    Y = value.(model.variables.Y)
-    X = value.(model.variables.X)
+    # Y = value.(model.variables.Y)
+    # X = value.(model.variables.X)
 
-    if sum(λ1) < model.Γ1
-        # select all the jobs that are not delayed, and sort them by Y value
+    # if sum(λ1) < model.Γ1
+    #     # select all the jobs that are not delayed, and sort them by Y value
 
-        number_of_jobs_to_delay = model.Γ1 - sum(λ1)
+    #     number_of_jobs_to_delay = model.Γ1 - sum(λ1)
 
-        jobs_not_delayed = [i for i in 1:model.n if λ1[i] == 0]
+    #     jobs_not_delayed = [i for i in 1:model.n if λ1[i] == 0]
 
-        Y_sum = [sum(Y[i, j] for j in 1:length(model.Λ)) for i in 1:model.n]
+    #     Y_sum = [sum(Y[i, j] for j in 1:length(model.Λ)) for i in 1:model.n]
 
-        # select the number_of_jobs_to_delay jobs with the highest Y value
-        jobs_not_delayed = sort(jobs_not_delayed, by = i -> Y_sum[i], rev = true)[1:number_of_jobs_to_delay]
+    #     # select the number_of_jobs_to_delay jobs with the highest Y value
+    #     jobs_not_delayed = sort(jobs_not_delayed, by = i -> Y_sum[i], rev = true)[1:number_of_jobs_to_delay]
 
-        for i in jobs_not_delayed
-            λ1[i] = 1
-        end
-    end
+    #     for i in jobs_not_delayed
+    #         λ1[i] = 1
+    #     end
+    # end
 
-    if sum(λ2) < model.Γ2
-        # select all the jobs that are not delayed, and sort them by X value 
+    # if sum(λ2) < model.Γ2
+    #     # select all the jobs that are not delayed, and sort them by X value 
 
-        number_of_jobs_to_delay = model.Γ2 - sum(λ2)
+    #     number_of_jobs_to_delay = model.Γ2 - sum(λ2)
 
-        jobs_not_delayed = [i for i in 1:model.n if λ2[i] == 0]
+    #     jobs_not_delayed = [i for i in 1:model.n if λ2[i] == 0]
 
-        #sum the X by column
-        sum_X = [sum(X[i, j] for j in 1:length(model.Λ)) for i in 1:model.n]
+    #     #sum the X by column
+    #     sum_X = [sum(X[i, j] for j in 1:length(model.Λ)) for i in 1:model.n]
 
-        # select the number_of_jobs_to_delay jobs with the highest Y value
+    #     # select the number_of_jobs_to_delay jobs with the highest Y value
 
-        jobs_not_delayed = sort(jobs_not_delayed, by = i -> sum_X[i])[1:number_of_jobs_to_delay]
+    #     jobs_not_delayed = sort(jobs_not_delayed, by = i -> sum_X[i])[1:number_of_jobs_to_delay]
 
-        for i in jobs_not_delayed
-            λ2[i] = 1
-        end
-    end
+    #     for i in jobs_not_delayed
+    #         λ2[i] = 1
+    #     end
+    # end
 
     return value_α, (λ1, λ2)
 end
