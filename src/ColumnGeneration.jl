@@ -79,6 +79,12 @@ function column_generation(model::T; ϵ=10^-6, max_iterations=-1, timeout=7200, 
 
         set_optimizer_attribute(model.model, "CPXPARAM_MIP_Limits_TreeMemory", 6144)
 
+        set_optimizer_attribute(model.model, "CPXPARAM_Emphasis_MIP", 2)
+
+        set_optimizer_attribute(model.model, "CPXPARAM_MIP_Strategy_Probe", 3)
+
+        set_optimizer_attribute(model.model, "CPXPARAM_MIP_Strategy_StartAlgorithm", 2)
+
         set_start_value_for_model(model, permutation_variable)
 
         time_MP = @elapsed optimize!(model.model)

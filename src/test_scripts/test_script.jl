@@ -11,7 +11,7 @@ function test_model(model::T; kwargs...) where T <: AbstractColumnGenerationMode
 
     duration = @elapsed begin
         # solve the model
-        stats = column_generation(model; timeout=7200, kwargs...)
+        stats = column_generation(model; timeout=3600, kwargs...)
     end
 
     return TestModel(string(typeof(model)),model.instance, duration, stats, kwargs)
