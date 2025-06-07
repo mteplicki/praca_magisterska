@@ -35,7 +35,8 @@ function SingleTardinessSumInstanceResultsToDataFrame(results::Vector)
         "first_LB" => Float64[],
         "first_UB" => Float64[],
         "last_LB" => Float64[],
-        "last_UB" => Float64[]
+        "last_UB" => Float64[],
+        "instance_hash" => UInt[]
     ])
     for result in results
         row = Dict(
@@ -70,6 +71,7 @@ function SingleTardinessSumInstanceResultsToDataFrame(results::Vector)
             else
                 last(result.result_stats.UB)
             end,
+            "instance_hash" => hash(result.instance)
         )
         @show row
         push!(df, row)
