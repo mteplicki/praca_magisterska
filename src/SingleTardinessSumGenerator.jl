@@ -16,23 +16,13 @@ function generate_instances(dir::AbstractString, k::Int, n::Int, R::Float64, T::
     end
 end
 
-dir = "./instances/single_tardiness_sum_poprawione"
+dir = "./instances/single_tardy_jobs"
 
-for n = [20,40,60]
-    for R = [1.0]
-        for T = [0.6,0.8]
+for n = [10,20]
+    for R = [0.2,0.6]
+        for T = [0.2,0.6]
             for G = [10., 100.]
-                generate_instances(dir, 5, n, R, T, G)
-            end
-        end
-    end
-end
-
-for n = [20,40,60]
-    for R = [0.6]
-        for T = [0.8]
-            for G = [10., 100.]
-                generate_instances(dir, 5, n, R, T, G)
+                generate_instances(dir, 3, n, R, T, G)
             end
         end
     end
@@ -40,7 +30,7 @@ end
 
 #create file model_type with the content "SingleTardyJobs"
 open(dir*"/model_type", "w") do f
-    write(f, "SingleSumOfTardiness")
+    write(f, "SingleTardyJobs")
 end
 
 

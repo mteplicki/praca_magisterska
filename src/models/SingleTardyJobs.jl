@@ -30,7 +30,7 @@ function SingleTardyJobsModel(optimizer, instance::SingleMachineDueDates)
 
     w = ones(n)
 
-    model = Model(optimizer)
+    model = direct_model(optimizer)
 
     r = zeros(Int, n)
 
@@ -109,7 +109,10 @@ function update_model!(model::SingleTardyJobsModel, new_Λ::Vector{BitVector}, L
     return model
 end
 
-function find_job_permutation(x_matrix)
+function find_permutation(model::SingleTardyJobsModel)
+    x_matrix = value.(model.variables.Z)
+    # Convert the matrix to a boolean matrix
+    x_matrix = x_matrix .> 0.5  # Convert to boolean matrix
     n = size(x_matrix, 1)  # Number of jobs
     in_degree = Dict(j => 0 for j in 1:n)
     adj_list = Dict(i => Int[] for i in 1:n)
@@ -145,7 +148,9 @@ function find_job_permutation(x_matrix)
         end
     end
 
-    return job_sequence  # The job permutation
+    σ = job_sequence
+
+    return σ  # The job permutation
 end
 
 function oracle_subproblem(model::SingleTardyJobsModel, permutation, kwargs)
@@ -434,17 +439,29 @@ function oracle_subproblem2(model::SingleTardyJobsModel, σ::Vector{Int})
     return max_value, δ
 end
 
-function find_permutation(model::SingleTardyJobsModel)
-    Z = value.(model.variables.Z)
-    Z = Z .> 0.5
-    n = model.n
-    σ = zeros(Int, n)
-    for i in 1:n
-        for j in 1:n
-            if Z[i,j] == 1
-                σ[j] = i
-            end
-        end
+# function find_permutation(model::SingleTardyJobsModel)
+#     Z = value.(model.variables.Z)
+#     @show Z
+#     Z = Z .> 0.5
+#     n = model.n
+#     σ = zeros(Int, n)
+#     for i in 1:n
+#         for j in 1:n
+#             if Z[i,j] == 1
+#                 σ[j] = i
+#             end
+#         end
+#     end
+#     return σ
+# end
+
+save_permutation_variable(model::SingleTardyJobsModel) = (value.(model.variables.Z),value.(model.variables.S), value.(model.variables.U))
+
+set_start_value_for_model(model::SingleTardyJobsModel, permutation_variable) = begin
+    if !isnothing(permutation_variable)
+        Z, S, U = permutation_variable
+        set_start_value.(model.variables.Z, Z)
+        set_start_value.(model.variables.S[1:model.n,1:(end-1)], S)
+        set_start_value.(model.variables.U[1:model.n,1:(end-1)], U)
     end
-    return σ
 end
