@@ -23,7 +23,14 @@ struct ColumnGenerationStatsExtended
     AP_time::Vector{Float64}
     kwargs
 end
-
+"""
+Function that implements the column generation algorithm.
+- `model`: An instance of a subtype of `AbstractColumnGenerationModel`.
+- `ϵ`: Tolerance for the optimality gap (default is 10^-6).
+- `max_iterations`: Maximum number of iterations (default is -1, meaning no limit).
+- `timeout`: Maximum time allowed for the algorithm in seconds (default is 7200 seconds).
+- `kwargs`: Additional keyword arguments.
+"""
 function column_generation(model::T; ϵ=10^-6, max_iterations=-1, timeout=7200, kwargs...) where T <: AbstractColumnGenerationModel
     time_start = time()
     # Pobieramy "prawdziwy" optymalizator spod warstw mostów
