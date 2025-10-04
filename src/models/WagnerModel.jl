@@ -17,6 +17,9 @@ struct WagnerModel <: AbstractColumnGenerationModel
     model::Model
 end
 
+"""
+Constructor that creates a Wagner MIP program from an instance of `TwoRPFPInstance`.
+"""
 WagnerModel(optimizer, instance::TwoRPFPInstance) = WagnerModel(optimizer, instance.n, instance.p, instance.phat, (instance.Γ1, instance.Γ2))
 
 
@@ -116,7 +119,9 @@ function update_model!(model::WagnerModel, new_Λ::Vector{Tuple{BitVector, BitVe
     return model
 end
 
-
+"""
+Solves the oracle subproblem for a given job permutation `permutation`.
+"""
 function oracle_subproblem(model::WagnerModel, permutation, kwargs)
     # Z is a permutation matrix. Transform it into a permutation vector
     
@@ -304,7 +309,9 @@ function oracle_subproblem(model::WagnerModel, permutation, kwargs)
     return value_α, (λ1, λ2)
 end
 
-
+"""
+Extracts the job permutation from the solution of the Wagner model.
+"""
 function find_permutation(model::WagnerModel)
     Z_float = value.(model.variables.Z)
 
@@ -316,8 +323,14 @@ function find_permutation(model::WagnerModel)
     return σ
 end
 
+"""
+Saves the current permutation variable values from the model.
+"""
 save_permutation_variable(model::WagnerModel) = value.(model.variables.Z)
 
+"""
+Sets the start values for the permutation variable Z based on a given permutation.
+"""
 function set_start_value_for_model(model::WagnerModel, permutation)
     if !isnothing(permutation)
         set_start_value.(model.variables.Z, permutation)

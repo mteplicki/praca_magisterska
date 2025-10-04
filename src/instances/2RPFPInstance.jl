@@ -5,7 +5,12 @@ struct TwoRPFPInstance <: AbstractInstance
     Γ1::Int
     Γ2::Int
 end
-
+"""
+Creates an instance of the two-machine robust permutation flowshop problem with uncertain processing times from a file.
+- `path`: Path to the file containing the instance data.
+- `Γ1_percent`: Percentage of jobs for the uncertainty budget on machine 1 (between 0 and 1).
+- `Γ2_percent`: Percentage of jobs for the uncertainty budget on machine 2 (between 0 and 1).
+"""
 function TwoRPFPInstanceReader(path::String, Γ1_percent::Float64, Γ2_percent::Float64)
     # Read the file
     file = open(path, "r")
@@ -32,6 +37,11 @@ function TwoRPFPInstanceReader(path::String, Γ1_percent::Float64, Γ2_percent::
     
 end
 
+"""
+Creates a random instance of the two-machine robust permutation flowshop problem with uncertain processing times.
+- `n`: Number of jobs.
+- `G`: Uncertainty budget (a positive float).
+"""
 function TwoRPFPInstance(n::Int, G::Float64)
     p_min = 1
     p_max = 100

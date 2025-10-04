@@ -15,7 +15,11 @@ struct MultiUnrelatedMakespan <: AbstractColumnGenerationModel
     model::Model
 end
 
+"""
+Constructor that creates a MIP program from an instance of `MultiUnrelatedInstance`.
+"""
 MultiUnrelatedMakespan(optimizer, instance::MultiUnrelatedInstance) = MultiUnrelatedMakespan(optimizer, instance.n, instance.m, instance.p, instance.phat, instance.Γ, instance.p_min, instance.p_max, instance.G)
+
 
 function MultiUnrelatedMakespan(optimizer, n::Int, m::Int, p::Matrix{Int}, phat::Matrix{Int}, Γ::Int, p_min, p_max, G::Float64)
     model = Model(optimizer)

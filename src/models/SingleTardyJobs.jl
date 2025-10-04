@@ -19,6 +19,9 @@ struct SingleTardyJobsModel <: AbstractColumnGenerationModel
     model::Model
 end
 
+"""
+Constructor that creates a MIP program from an instance of `SingleMachineDueDates`.
+"""
 function SingleTardyJobsModel(optimizer, instance::SingleMachineDueDates) 
 
     n = instance.n
@@ -147,6 +150,7 @@ function find_job_permutation(x_matrix)
 
     return job_sequence  # The job permutation
 end
+
 
 function oracle_subproblem(model::SingleTardyJobsModel, permutation, kwargs)
     σ = permutation

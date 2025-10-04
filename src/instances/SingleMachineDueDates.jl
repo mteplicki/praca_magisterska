@@ -10,7 +10,13 @@ struct SingleMachineDueDates <: AbstractInstance
     G::Float64
 end
 
-
+"""
+Creates a random instance of the single-machine scheduling problem with due dates and uncertain processing times.
+- `n`: Number of jobs.
+- `R`: Relative range for due dates (a float between 0 and 1).
+- `T`: Tardiness factor for due dates (a float between 0 and 1).
+- `G`: Uncertainty budget (a positive float).
+"""
 function SingleMachineDueDates(n::Int, R::Float64, T::Float64, G::Float64)
     p_min = 1
     p_max = 100

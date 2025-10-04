@@ -16,6 +16,11 @@ struct SingleTardiness <: AbstractColumnGenerationModel
     model::Model
 end
 
+"""
+Constructor that creates a MIP program from an instance of `SingleMachineDueDates`.
+ - `optimizer`: The optimizer to be used (e.g., Gurobi.Optimizer).
+ - `instance`: An instance of `SingleMachineDueDates`.
+"""
 function SingleTardiness(optimizer, instance::SingleMachineDueDates) 
 
     n = instance.n

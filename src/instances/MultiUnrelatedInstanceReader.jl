@@ -1,3 +1,7 @@
+"""
+Creates an instance of the multi-machine unrelated parallel machine scheduling problem with uncertain processing times from a file.
+- `path`: Path to the file containing the instance data.
+"""
 function MultiUnrelatedInstanceReader(path::String)
     # Read the file
     file = open(path, "r")

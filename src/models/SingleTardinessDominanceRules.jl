@@ -74,7 +74,11 @@ function compute_dominated_sets(n, p, phat, d, Γ)
     end
     return A, B
 end
-
+"""
+Creates a SingleTardinessDominanceRules model from an instance.
+- `optimizer`: The optimizer to use (e.g., `GLPK.Optimizer`).
+- `instance`: An instance of `SingleMachineDueDates`.
+"""
 SingleTardinessDominanceRules(optimizer, instance::SingleMachineDueDates) = SingleTardinessDominanceRules(optimizer, instance.n, instance.p, instance.phat, instance.d, instance.Γ)
 
 function SingleTardinessDominanceRules(optimizer, n::Int, p::Vector{Int}, phat::Vector{Int}, d::Vector{Int}, Γ::Int)

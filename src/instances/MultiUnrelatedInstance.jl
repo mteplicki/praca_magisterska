@@ -8,7 +8,14 @@ struct MultiUnrelatedInstance <: AbstractInstance
     p_max::Int
     G::Float64
 end
-
+"""
+Creates a random instance of the multi-machine scheduling problem with unrelated machines and uncertain processing times.
+- `n`: Number of jobs.
+- `m`: Number of machines.
+- `G`: Uncertainty budget (a positive float).
+- `p_min`: Minimum processing time for jobs (default is 1).
+- `p_max`: Maximum processing time for jobs (default is 100).
+"""
 function MultiUnrelatedInstance(n::Int, m::Int, G::Float64, p_min=1, p_max=100)
 
     p = rand(p_min:p_max, m, n)
@@ -20,6 +27,13 @@ function MultiUnrelatedInstance(n::Int, m::Int, G::Float64, p_min=1, p_max=100)
     return MultiUnrelatedInstance(n, m, p, phat, Γ, p_min, p_max, G)
 end
 
+"""
+Creates a random instance of the multi-machine scheduling problem with unrelated machines and uncertain processing times, given a specific processing time matrix.
+- `n`: Number of jobs.
+- `m`: Number of machines.
+- `p`: Processing time matrix (m x n).
+- `G`: Uncertainty budget (a positive float).
+"""
 function MultiUnrelatedInstance(n::Int, m::Int, p::Matrix{Int}, G::Float64)
     p_min = minimum(p)
     p_max = maximum(p)
